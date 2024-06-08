@@ -454,9 +454,6 @@ def handle_help_button(call):
         telebot.types.InlineKeyboardButton(
             text="Change Language", callback_data="change_language"
         ),
-        telebot.types.InlineKeyboardButton(
-            text="AI Support", callback_data="ai_support"
-        ),
     ]
     help_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
     help_keyboard.add(*help_buttons)
@@ -497,18 +494,6 @@ def handle_set_language(call):
     set_user_language(chat_id, language)
 
     bot.send_message(chat_id, f"Language has been set to {language.capitalize()}.")
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "ai_support")
-def handle_ai_support(call):
-    chat_id = call.message.chat.id
-
-    # Implement your AI support logic here
-    bot.send_message(
-        chat_id,
-        "AI Support is here to help you with your queries. How can I assist you today?",
-    )
-
 
 def set_user_language(chat_id, language):
     # Implement your logic to set the user's language preference
