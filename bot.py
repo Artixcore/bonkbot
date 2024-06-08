@@ -449,56 +449,5 @@ def handle_help_button(call):
         "  - Limit Orders Buy/Sell Transactions: 1.25%\n"
     )
 
-    # Add buttons for language settings and AI support
-    help_buttons = [
-        telebot.types.InlineKeyboardButton(
-            text="Change Language", callback_data="change_language"
-        ),
-    ]
-    help_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
-    help_keyboard.add(*help_buttons)
-
-    bot.send_message(
-        chat_id, help_menu_message, reply_markup=help_keyboard, parse_mode="Markdown"
-    )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "change_language")
-def handle_change_language(call):
-    chat_id = call.message.chat.id
-
-    # Ask user to choose a language
-    language_buttons = [
-        telebot.types.InlineKeyboardButton(
-            text="English", callback_data="set_language_english"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="Spanish", callback_data="set_language_spanish"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="French", callback_data="set_language_french"
-        ),
-    ]
-    language_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
-    language_keyboard.add(*language_buttons)
-
-    bot.send_message(chat_id, "Choose your language:", reply_markup=language_keyboard)
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("set_language_"))
-def handle_set_language(call):
-    chat_id = call.message.chat.id
-    language = call.data.split("_")[-1]
-
-    # Implement your logic to set the language for the user
-    set_user_language(chat_id, language)
-
-    bot.send_message(chat_id, f"Language has been set to {language.capitalize()}.")
-
-def set_user_language(chat_id, language):
-    # Implement your logic to set the user's language preference
-    print(f"Setting language for chat ID {chat_id} to {language}")
-
-
 if __name__ == "__main__":
     bot.polling()
