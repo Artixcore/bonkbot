@@ -8,15 +8,15 @@ bot = telebot.TeleBot(token)
 
 # Define button labels and corresponding callback data
 buttons = [
-    telebot.types.InlineKeyboardButton(text="Buy", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="Sell", callback_data="sell"),
-    telebot.types.InlineKeyboardButton(text="Manage", callback_data="manage"),
+    telebot.types.InlineKeyboardButton(text="Buy 🟢", callback_data="buy"),
+    telebot.types.InlineKeyboardButton(text="Sell & Manage🔴", callback_data="sell"),
+    # telebot.types.InlineKeyboardButton(text="Manage", callback_data="manage"),
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
-    telebot.types.InlineKeyboardButton(text="Wallet", callback_data="wallet"),
-    telebot.types.InlineKeyboardButton(text="Settings", callback_data="settings"),
-    telebot.types.InlineKeyboardButton(text="Refresh", callback_data="refresh"),
+    telebot.types.InlineKeyboardButton(text="Wallet 👛", callback_data="wallet"),
+    telebot.types.InlineKeyboardButton(text="Settings ⚙️", callback_data="settings"),
+    telebot.types.InlineKeyboardButton(text="Refresh 🔄", callback_data="refresh"),
 ]
 
 # Create a 3x3 inline keyboard layout
@@ -32,8 +32,7 @@ def start(message):
         "*Main Menu:*\n"
         "- [Social Media Links](your-link-here)\n"
         "- [Referral Program](your-referral-link-here)\n"
-        "- *Your Wallet Address:* `Click to Copy`\n"
-        "- *Solana Balance & Price Tracker*\n"
+         "- *Solana Balance & Price Tracker*\n"
         "- *Current SOL Price*: [Price Info](your-price-link-here)\n"
     )
     bot.send_message(
@@ -558,6 +557,69 @@ def get_token_positions(wallet_address):
         {"token": "TOKEN2", "amount": 200, "pnl": -5},
     ]
 
+
+@bot.callback_query_handler(func=lambda call: call.data == "refer")
+def handle_refer_button(call):
+    chat_id = call.message.chat.id
+
+    # Fetch user's referral link and referral status (replace with your logic)
+    referral_link = get_user_referral_link(chat_id)
+    referral_status = get_user_referral_status(chat_id)
+
+    # Prepare Refer message
+    refer_message = (
+        f"Your Referral Link: {referral_link}\n\n"
+        "Invite 20 friends and have each of them make a trade to receive 5% off Manual/Buy & Sell transaction fees and 10% off limit order transactions.\n\n"
+        "Trading bot fees after 20 referrals:\n"
+        "- Regular & Manual Buy/Sell Transactions: 0.95%\n"
+        "- Limit Orders Buy/Sell Transactions: 1.125%\n\n"
+        f"Current Referrals: {referral_status['count']}\n"
+        f"Discounts: {referral_status['discounts']}\n"
+    )
+
+    bot.send_message(chat_id, refer_message)
+
+
+def get_user_referral_link(chat_id):
+    # Implement your logic to retrieve the user's referral link
+    # Example: Generate or fetch from database
+    return f"https://t.me/sol_oink_bot"
+
+
+def get_user_referral_status(chat_id):
+    # Implement your logic to retrieve the user's referral status
+    # Example: Fetch from database
+    return {
+        "count": 15,  # Example: User has 15 referrals
+        "discounts": {"manual_buy_sell": "1%", "limit_orders": "1.25%"},
+    }
+
+
+def update_referral_status(chat_id):
+    referral_status = get_user_referral_status(chat_id)
+
+    # Update referral count
+    referral_status["count"] += 1
+
+    # Check if the user has 20 referrals
+    if referral_status["count"] >= 20:
+        referral_status["discounts"] = {
+            "manual_buy_sell": "0.95%",
+            "limit_orders": "1.125%",
+        }
+
+    # Save updated status (replace with your logic to save to database)
+    save_user_referral_status(chat_id, referral_status)
+
+
+def save_user_referral_status(chat_id, status):
+    # Implement your logic to save the user's referral status
+    pass
+
+
+# Example: After a successful referral
+chat_id = "user_chat_id"
+update_referral_status(chat_id)
 
 if __name__ == "__main__":
     bot.polling()
