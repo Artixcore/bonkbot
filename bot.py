@@ -1,625 +1,330 @@
 import telebot
 import requests
+import sqlite3
+import logging
 
-# Replace with your actual Telegram bot token
 token = "7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
 
 bot = telebot.TeleBot(token)
 
 # Define button labels and corresponding callback data
 buttons = [
-    telebot.types.InlineKeyboardButton(text="Buy 🟢", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="Sell & Manage🔴", callback_data="sell"),
-    # telebot.types.InlineKeyboardButton(text="Manage", callback_data="manage"),
+    telebot.types.InlineKeyboardButton(text="       Buy🟢       ", callback_data="buy"),
+    telebot.types.InlineKeyboardButton(text="Sell & Manage 🔴", callback_data="sell"),
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
     telebot.types.InlineKeyboardButton(text="Wallet 👛", callback_data="wallet"),
     telebot.types.InlineKeyboardButton(text="Settings ⚙️", callback_data="settings"),
     telebot.types.InlineKeyboardButton(text="Refresh 🔄", callback_data="refresh"),
+    telebot.types.InlineKeyboardButton(text="Close", callback_data="close")
 ]
 
-# Create a 3x3 inline keyboard layout
+# Create a 3x3 inline keyboard layout with adjusted spacing for the first row
 keyboard = telebot.types.InlineKeyboardMarkup(row_width=3)
-keyboard.add(*buttons)
+keyboard.add(*buttons[:2])
+keyboard.add(*buttons[2:])
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Database setup
+def create_database():
+    conn = sqlite3.connect('referrals.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS user_referrals
+                 (chat_id TEXT PRIMARY KEY, referral_count INTEGER, discount_text TEXT)''')
+    conn.commit()
+    conn.close()
+
+def add_user_referral(chat_id, referral_count, discount_text):
+    conn = sqlite3.connect('referrals.db')
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO user_referrals (chat_id, referral_count, discount_text) VALUES (?, ?, ?)",
+              (chat_id, referral_count, discount_text))
+    conn.commit()
+    conn.close()
+
+def get_user_referral_status(chat_id):
+    conn = sqlite3.connect('referrals.db')
+    c = conn.cursor()
+    c.execute("SELECT referral_count, discount_text FROM user_referrals WHERE chat_id = ?", (chat_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {"count": row[0], "discounts": row[1]}
+    else:
+        return {"count": 0, "discounts": "No discounts available"}
+
+# Initialize the database
+create_database()
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    chat_id = message.chat.id
-    welcome_message = (
-        "*Welcome to OINKbot!*\nHere are your options:\n\n"
-        "*Main Menu:*\n"
-        "- [Social Media Links](your-link-here)\n"
-        "- [Referral Program](your-referral-link-here)\n"
-         "- *Solana Balance & Price Tracker*\n"
-        "- *Current SOL Price*: [Price Info](your-price-link-here)\n"
-    )
-    bot.send_message(
-        chat_id, welcome_message, reply_markup=keyboard, parse_mode="Markdown"
-    )
+    try:
+        chat_id = message.chat.id
+        sol_price = get_sol_price()
+        sol_balance = get_sol_balance_function(chat_id)
+        price_info_link = "https://www.coingecko.com/en/coins/solana"  # Link to SOL price info on CoinGecko
 
+        if sol_price is not None:
+            sol_price_message = f"*Current SOL Price*: ${sol_price} [Price Info]({price_info_link})\n"
+        else:
+            sol_price_message = "*Current SOL Price*: Failed to retrieve [Price Info]({price_info_link})\n"
+
+        welcome_message = (
+            "*Welcome to OINKbot!*\nHere are your options:\n\n"
+            "*Main Menu:*\n"
+            "- [Social Media Links](your-link-here)\n"
+            "- [Referral Program](your-referral-link-here)\n"
+            "- *Your Wallet Address:* `Click to Copy`\n"
+            "- *Solana Balance & Price Tracker*\n"
+            f"{sol_price_message}"
+            f"Sol Balance: {sol_balance} SOL\n"
+        )
+        bot.send_message(chat_id, welcome_message, reply_markup=keyboard, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in start handler: {e}")
+        bot.send_message(chat_id, "An error occurred while processing your request. Please try again later.")
 
 @bot.callback_query_handler(func=lambda call: call.data == "buy")
 def handle_buy_button(call):
-    chat_id = call.message.chat.id
-
-    # Prompt for token address
-    bot.send_message(chat_id, "Enter the wallet address of the token you want to buy:")
-    bot.register_next_step_handler(call.message, handle_token_address)
-
+    try:
+        chat_id = call.message.chat.id
+        bot.send_message(chat_id, "Enter the wallet address of the token you want to buy:")
+        bot.register_next_step_handler(call.message, handle_token_address)
+    except Exception as e:
+        logger.error(f"Error in handle_buy_button: {e}")
+        bot.send_message(call.message.chat.id, "An error occurred while processing your request. Please try again later.")
 
 def handle_token_address(message):
-    chat_id = message.chat.id
-    token_address = message.text
+    try:
+        chat_id = message.chat.id
+        token_address = message.text
+        token_info, dexscreener_link = get_token_info(token_address)
 
-    # Validation (optional)
-    if not is_valid_token_address(token_address):
-        bot.send_message(chat_id, "Invalid token address. Please try again.")
-        return
+        if token_info is None:
+            bot.send_message(chat_id, "Failed to retrieve token information. Please try again.")
+            return
 
-    # Fetch token details and Dexscreener link
-    token_info, dexscreener_link = get_token_info(token_address)
-
-    if token_info is None:
-        bot.send_message(
-            chat_id, "Failed to retrieve token information. Please try again."
+        sol_balance = get_sol_balance_function(chat_id)
+        buy_menu_message = f"Sol Balance: {sol_balance} SOL\n"
+        buy_menu_message += f"Dexscreener: [Dexscreener]({dexscreener_link})\n"
+        buy_menu_message += (
+            f"- Birdeye: [Birdeye Link](https://birdeye.com/{token_address})\n"
         )
-        return
+        buy_menu_message += f"- Rugcheck: [Rugcheck Link](https://rugcheck.io/{token_address})\n"
+        buy_menu_message += "Buy Options:\n"
+        buy_menu_message += (
+            "- Manual Buy: \n  - .5 SOL\n  - 1 SOL\n  - Buy X SOL (coming soon)\n"
+        )
+        buy_menu_message += "- Limit Order/Target Buy (coming soon)"
 
-    # Fetch SOL balance (replace with your wallet address logic)
-    sol_balance = get_sol_balance_function(chat_id)
-
-    # Prepare Buy Menu message
-    buy_menu_message = f"Sol Balance: {sol_balance} SOL\n"
-    buy_menu_message += f"Dexscreener: [Dexscreener]({dexscreener_link})\n"
-    buy_menu_message += (
-        f"- Birdeye: [Birdeye Link](your-birdeye-link-template.format(token_address))\n"
-    )
-    buy_menu_message += f"- Rugcheck: [Rugcheck Link](your-rugcheck-link-template.format(token_address))\n"
-    buy_menu_message += "Buy Options:\n"
-    buy_menu_message += (
-        "- Manual Buy: \n  - .5 SOL\n  - 1 SOL\n  - Buy X SOL (coming soon)\n"
-    )
-    buy_menu_message += "- Limit Order/Target Buy (coming soon)"
-
-    bot.send_message(chat_id, buy_menu_message, parse_mode="Markdown")
-
+        bot.send_message(chat_id, buy_menu_message, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in handle_token_address: {e}")
+        bot.send_message(message.chat.id, "An error occurred while processing your request. Please try again later.")
 
 @bot.callback_query_handler(func=lambda call: call.data == "sell")
 def handle_sell_button(call):
-    chat_id = call.message.chat.id
-
-    # Fetch token positions (replace with your logic)
-    positions = get_token_positions(chat_id)
-
-    # Prepare Sell & Manage Menu message
-    sell_menu_message = "Sell & Manage\n\n"
-    sell_menu_message += "Token Positions:\n"
-    for position in positions:
-        sell_menu_message += (
-            f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
-        )
-    sell_menu_message += "\nOpen Orders:\n"
-    sell_menu_message += "Limit Buy Orders:\n"
-    # Add logic to list limit buy orders
-    sell_menu_message += "Limit Sell Orders:\n"
-    # Add logic to list limit sell orders
-
-    # Add buttons for actions
-    sell_buttons = [
-        telebot.types.InlineKeyboardButton(
-            text="Open Orders", callback_data="open_orders"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="Change Order", callback_data="change_order"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="Cancel Order", callback_data="cancel_order"
-        ),
-        telebot.types.InlineKeyboardButton(text="Sell", callback_data="sell_options"),
-    ]
-    sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
-    sell_keyboard.add(*sell_buttons)
-
-    bot.send_message(chat_id, sell_menu_message, reply_markup=sell_keyboard)
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "open_orders")
-def handle_open_orders(call):
-    chat_id = call.message.chat.id
-
-    # Fetch open orders (replace with your logic)
-    open_orders = get_open_orders(chat_id)
-
-    # Prepare Open Orders message
-    open_orders_message = "Open Orders:\n"
-    for order in open_orders:
-        open_orders_message += f"- {order['type']}: {order['amount']} @ {order['price']} (expires in {order['expiry']})\n"
-
-    bot.send_message(chat_id, open_orders_message)
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "change_order")
-def handle_change_order(call):
-    chat_id = call.message.chat.id
-
-    # Ask user to select position to change
-    bot.send_message(
-        chat_id, "Enter the token address of the position you want to change:"
-    )
-    bot.register_next_step_handler(call.message, handle_change_order_details)
-
-
-def handle_change_order_details(message):
-    chat_id = message.chat.id
-    token_address = message.text
-
-    # Ask for new expiration and order size
-    bot.send_message(
-        chat_id,
-        "Enter the new expiration time (e.g., 30m, 2h, 1d) and new order size (in SOL):",
-    )
-    bot.register_next_step_handler(message, finalize_change_order, token_address)
-
-
-def finalize_change_order(message, token_address):
-    chat_id = message.chat.id
-    details = message.text.split()
-    if len(details) != 2:
-        bot.send_message(
-            chat_id, "Invalid format. Please provide expiration time and order size."
-        )
-        return
-
-    expiration, order_size = details
-
-    # Implement your logic to change the order
-    change_order(token_address, expiration, order_size)
-
-    bot.send_message(chat_id, "Order updated successfully.")
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "cancel_order")
-def handle_cancel_order(call):
-    chat_id = call.message.chat.id
-
-    # Ask user to select position to cancel
-    bot.send_message(
-        chat_id, "Enter the token address of the position you want to cancel:"
-    )
-    bot.register_next_step_handler(call.message, finalize_cancel_order)
-
-
-def finalize_cancel_order(message):
-    chat_id = message.chat.id
-    token_address = message.text
-
-    # Implement your logic to cancel the order
-    cancel_order(token_address)
-
-    bot.send_message(chat_id, "Order canceled successfully.")
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "sell_options")
-def handle_sell_options(call):
-    chat_id = call.message.chat.id
-
-    # Add sell options (e.g., sell 1 SOL, sell X SOL, sell all SOL)
-    sell_options_message = "Sell Options:\n"
-    sell_options_message += "- Sell 1 SOL\n"
-    sell_options_message += "- Sell X SOL (coming soon)\n"
-    sell_options_message += "- Sell all SOL\n"
-
-    bot.send_message(chat_id, sell_options_message)
-
-
-def is_valid_token_address(token_address):
-    # Implement your logic to validate the token address
-    # Example: Check if the address length is correct and if it follows a specific format
-    if len(token_address) == 42 and token_address.startswith("0x"):
-        return True
-    return False
-
-
-# Functions to retrieve token info, SOL balance, etc. (replace with your implementation)
-def get_token_info(token_address):
-    # Example Dexscreener API endpoint
-    api_url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
     try:
-        response = requests.get(api_url)
-        response.raise_for_status()  # Raises an HTTPError for bad responses
-        token_data = response.json()
-        # Extract the link if available, otherwise use a default message
-        dexscreener_link = token_data.get("link", "No link available")
-        return token_data, dexscreener_link
-    except requests.RequestException as e:
-        print(f"Failed to retrieve token information: {e}")
-        return None, None
+        chat_id = call.message.chat.id
+        positions = get_token_positions(chat_id)
 
+        sell_menu_message = "Sell & Manage\n\n"
+        sell_menu_message += "Token Positions:\n"
+        for position in positions:
+            sell_menu_message += f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
+        sell_menu_message += "\nOpen Orders:\n"
+        sell_menu_message += "Limit Buy Orders:\n"
+        # Add logic to list limit buy orders
+        sell_menu_message += "Limit Sell Orders:\n"
+        # Add logic to list limit sell orders
 
-def get_sol_balance_function(wallet_address):
-    # Example using Solana's JSON RPC API
-    api_url = "https://api.mainnet-beta.solana.com"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getBalance",
-        "params": [wallet_address],
-    }
+        sell_buttons = [
+            telebot.types.InlineKeyboardButton(text="Open Orders", callback_data="open_orders"),
+            telebot.types.InlineKeyboardButton(text="Change Order", callback_data="change_order"),
+            telebot.types.InlineKeyboardButton(text="Cancel Order", callback_data="cancel_order"),
+            telebot.types.InlineKeyboardButton(text="Sell", callback_data="sell_options"),
+            telebot.types.InlineKeyboardButton(text="Refresh", callback_data="refresh_sell_manage"),
+            telebot.types.InlineKeyboardButton(text="Close", callback_data="close")
+        ]
+        sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+        sell_keyboard.add(*sell_buttons)
+
+        bot.send_message(chat_id, sell_menu_message, reply_markup=sell_keyboard)
+    except Exception as e:
+        logger.error(f"Error in handle_sell_button: {e}")
+        bot.send_message(call.message.chat.id, "An error occurred while processing your request. Please try again later.")
+
+@bot.callback_query_handler(func=lambda call: call.data == "refresh_sell_manage")
+def handle_refresh_sell_manage(call):
     try:
-        response = requests.post(api_url, headers=headers, json=payload)
-        response.raise_for_status()  # Raises an HTTPError for bad responses
-        balance_data = response.json()
-        return (
-            balance_data.get("result", {}).get("value", 0) / 1e9
-        )  # Convert lamports to SOL
-    except requests.RequestException as e:
-        print(f"Failed to retrieve SOL balance: {e}")
-        return 0
-
-
-def get_token_positions(wallet_address):
-    # Implement your logic to retrieve token positions
-    # Example positions list (replace with actual data)
-    return [
-        {"token": "TOKEN1", "amount": 100, "pnl": 10},
-        {"token": "TOKEN2", "amount": 200, "pnl": -5},
-    ]
-
-
-def get_open_orders(wallet_address):
-    # Implement your logic to retrieve open orders
-    # Example open orders list (replace with actual data)
-    return [
-        {"type": "buy", "amount": 10, "price": 100, "expiry": "30m"},
-        {"type": "sell", "amount": 5, "price": 200, "expiry": "1h"},
-    ]
-
-
-def change_order(token_address, expiration, order_size):
-    # Implement your logic to change the order
-    print(f"Changing order for {token_address} to {expiration} and size {order_size}")
-
-
-def cancel_order(token_address):
-    # Implement your logic to cancel the order
-    print(f"Cancelling order for {token_address}")
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "wallet")
-def handle_wallet_button(call):
-    chat_id = call.message.chat.id
-
-    # Fetch Oinkbot Wallet Address (replace with your logic)
-    oinkbot_wallet_address = get_oinkbot_wallet_address(chat_id)
-
-    # Prepare Wallet Menu message
-    wallet_menu_message = f"Oinkbot Wallet Address: {oinkbot_wallet_address}\n"
-    wallet_menu_message += (
-        "Viewable on [Solscan](https://solscan.io/account/your_wallet_address_here)\n"
-    )
-    wallet_menu_message += "Choose an option below:"
-
-    # Add buttons for wallet actions
-    wallet_buttons = [
-        telebot.types.InlineKeyboardButton(
-            text="Deposit SOL", callback_data="deposit_sol"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="Withdraw All SOL", callback_data="withdraw_all_sol"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="Withdraw X SOL", callback_data="withdraw_x_sol"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="Reset Wallet", callback_data="reset_wallet"
-        ),
-        telebot.types.InlineKeyboardButton(
-            text="Export Private Key", callback_data="export_private_key"
-        ),
-    ]
-    wallet_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
-    wallet_keyboard.add(*wallet_buttons)
-
-    bot.send_message(
-        chat_id,
-        wallet_menu_message,
-        reply_markup=wallet_keyboard,
-        parse_mode="Markdown",
-    )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "deposit_sol")
-def handle_deposit_sol(call):
-    chat_id = call.message.chat.id
-    bot.send_message(
-        chat_id,
-        "To deposit SOL, send SOL to the following address: your_deposit_wallet_address_here",
-    )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "withdraw_all_sol")
-def handle_withdraw_all_sol(call):
-    chat_id = call.message.chat.id
-    bot.send_message(chat_id, "Enter the wallet address to withdraw all SOL to:")
-    bot.register_next_step_handler(call.message, finalize_withdraw_all_sol)
-
-
-def finalize_withdraw_all_sol(message):
-    chat_id = message.chat.id
-    withdraw_address = message.text
-
-    # Implement your logic to withdraw all SOL
-    withdraw_all_sol(withdraw_address)
-
-    bot.send_message(chat_id, "Withdrawal of all SOL initiated.")
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "withdraw_x_sol")
-def handle_withdraw_x_sol(call):
-    chat_id = call.message.chat.id
-    bot.send_message(
-        chat_id,
-        "Enter the wallet address and amount of SOL to withdraw (e.g., address 1.5):",
-    )
-    bot.register_next_step_handler(call.message, finalize_withdraw_x_sol)
-
-
-def finalize_withdraw_x_sol(message):
-    chat_id = message.chat.id
-    details = message.text.split()
-    if len(details) != 2:
-        bot.send_message(chat_id, "Invalid format. Please provide address and amount.")
-        return
-
-    withdraw_address, amount = details
-
-    # Implement your logic to withdraw X SOL
-    withdraw_x_sol(withdraw_address, float(amount))
-
-    bot.send_message(chat_id, f"Withdrawal of {amount} SOL initiated.")
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "reset_wallet")
-def handle_reset_wallet(call):
-    chat_id = call.message.chat.id
-
-    # Implement your logic to reset the wallet
-    reset_wallet(chat_id)
-
-    bot.send_message(chat_id, "Wallet has been reset.")
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "export_private_key")
-def handle_export_private_key(call):
-    chat_id = call.message.chat.id
-
-    # Fetch private key (replace with your logic)
-    private_key = get_private_key(chat_id)
-
-    bot.send_message(chat_id, f"Your private key: {private_key}")
-
-
-def get_oinkbot_wallet_address(wallet_address):
-    # Implement your logic to retrieve the Oinkbot wallet address
-    return "your_wallet_address_here"
-
-
-def withdraw_all_sol(withdraw_address):
-    # Implement your logic to withdraw all SOL
-    print(f"Withdrawing all SOL to {withdraw_address}")
-
-
-def withdraw_x_sol(withdraw_address, amount):
-    # Implement your logic to withdraw X SOL
-    print(f"Withdrawing {amount} SOL to {withdraw_address}")
-
-
-def reset_wallet(chat_id):
-    # Implement your logic to reset the wallet
-    print(f"Resetting wallet for chat ID {chat_id}")
-
-
-def get_private_key(chat_id):
-    # Implement your logic to retrieve the private key
-    return "your_private_key_here"
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "help")
-def handle_help_button(call):
-    chat_id = call.message.chat.id
-
-    # Prepare Help Menu message
-    help_menu_message = (
-        "Help & FAQ\n\n"
-        "FAQ:\n"
-        "- How to use the bot?\n"
-        "  [Tutorial](your-tutorial-link-here)\n"
-        "- About the bot:\n"
-        "  OINKbot helps you manage your SOL assets with ease.\n"
-        "- Multi-Language setting:\n"
-        "  Currently supported languages: English, Spanish, French.\n"
-        "- AI support:\n"
-        "  Our AI support helps you with real-time queries.\n"
-        "- Trading Bot Fees:\n"
-        "  - Regular & Manual Buy/Sell Transactions: 1%\n"
-        "  - Limit Orders Buy/Sell Transactions: 1.25%\n"
-    )
-
-
-def get_announcements_setting(chat_id):
-    # Implement your logic to retrieve the current announcements setting
-    return False
-
-
-def set_announcements_setting(chat_id, setting):
-    # Implement your logic to set the announcements setting
-    pass
-
-
-def validate_amount(amount):
-    # Implement your logic to validate the amount
-    try:
-        float(amount)
-        return True
-    except ValueError:
-        return False
-
-
-def save_buy_button_config(chat_id, amount):
-    # Implement your logic to save the buy button configuration
-    pass
-
-
-def save_sell_button_config(chat_id, amount):
-    # Implement your logic to save the sell button configuration
-    pass
-
-
-def validate_percentage(percentage):
-    # Implement your logic to validate the percentage
-    try:
-        float(percentage)
-        return True
-    except ValueError:
-        return False
-
-
-def save_slippage_config(chat_id, slippage):
-    # Implement your logic to save the slippage configuration
-    pass
-
-
-def save_price_impact_config(chat_id, price_impact):
-    # Implement your logic to save the price impact configuration
-    pass
-
-
-def set_mev_protect_mode(chat_id, mode):
-    # Implement your logic to set the MEV protect mode
-    pass
-
-
-def save_tx_priority_config(chat_id, priority, amount):
-    # Implement your logic to save the transaction priority configuration
-    pass
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "refresh")
-def handle_refresh_button(call):
-    chat_id = call.message.chat.id
-
-    # Fetch updated balances and positions (replace with your logic)
-    sol_balance = get_sol_balance_function(chat_id)
-    positions = get_token_positions(chat_id)
-
-    # Prepare Refresh message
-    refresh_message = f"Updated Balances and Positions:\n\n"
-    refresh_message += f"Sol Balance: {sol_balance} SOL\n"
-    refresh_message += "Token Positions:\n"
-    for position in positions:
-        refresh_message += (
-            f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
-        )
-
-    bot.send_message(chat_id, refresh_message)
-
-
-def get_sol_balance_function(wallet_address):
-    # Example using Solana's JSON RPC API
-    api_url = "https://api.mainnet-beta.solana.com"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getBalance",
-        "params": [wallet_address],
-    }
-    try:
-        response = requests.post(api_url, headers=headers, json=payload)
-        response.raise_for_status()  # Raises an HTTPError for bad responses
-        balance_data = response.json()
-        return (
-            balance_data.get("result", {}).get("value", 0) / 1e9
-        )  # Convert lamports to SOL
-    except requests.RequestException as e:
-        print(f"Failed to retrieve SOL balance: {e}")
-        return 0
-
-
-def get_token_positions(wallet_address):
-    # Implement your logic to retrieve token positions
-    # Example positions list (replace with actual data)
-    return [
-        {"token": "TOKEN1", "amount": 100, "pnl": 10},
-        {"token": "TOKEN2", "amount": 200, "pnl": -5},
-    ]
-
+        chat_id = call.message.chat.id
+        positions = get_token_positions(chat_id)
+
+        sell_menu_message = "Sell & Manage\n\n"
+        sell_menu_message += "Token Positions:\n"
+        for position in positions:
+            sell_menu_message += f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
+        sell_menu_message += "\nOpen Orders:\n"
+        sell_menu_message += "Limit Buy Orders:\n"
+        # Add logic to list limit buy orders
+        sell_menu_message += "Limit Sell Orders:\n"
+        # Add logic to list limit sell orders
+
+        sell_buttons = [
+            telebot.types.InlineKeyboardButton(text="Open Orders", callback_data="open_orders"),
+            telebot.types.InlineKeyboardButton(text="Change Order", callback_data="change_order"),
+            telebot.types.InlineKeyboardButton(text="Cancel Order", callback_data="cancel_order"),
+            telebot.types.InlineKeyboardButton(text="Sell", callback_data="sell_options"),
+            telebot.types.InlineKeyboardButton(text="Refresh", callback_data="refresh_sell_manage"),
+            telebot.types.InlineKeyboardButton(text="Close", callback_data="close")
+        ]
+        sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+        sell_keyboard.add(*sell_buttons)
+
+        current_message = call.message.text
+        current_reply_markup = call.message.reply_markup
+
+        if current_message != sell_menu_message or current_reply_markup != sell_keyboard:
+            bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=sell_menu_message, reply_markup=sell_keyboard)
+        else:
+            bot.answer_callback_query(callback_query_id=call.id, text="Nothing to refresh. The content is already up-to-date.")
+    except Exception as e:
+        logger.error(f"Error in handle_refresh_sell_manage: {e}")
+        bot.send_message(call.message.chat.id, "An error occurred while processing your request. Please try again later.")
 
 @bot.callback_query_handler(func=lambda call: call.data == "refer")
 def handle_refer_button(call):
-    chat_id = call.message.chat.id
+    try:
+        chat_id = call.message.chat.id
+        referral_link = get_user_referral_link(chat_id)
+        referral_status = get_user_referral_status(chat_id)
 
-    # Fetch user's referral link and referral status (replace with your logic)
-    referral_link = get_user_referral_link(chat_id)
-    referral_status = get_user_referral_status(chat_id)
+        refer_message = (
+            "Your Referral Link:\n"
+            f"{referral_link}\n\n"
+            "Invite 20 friends and have each of them make a trade to receive 5% off Manual/Buy & Sell transaction fees and 10% off limit order transactions.\n\n"
+            "Trading bot fees after 20 referrals:\n"
+            "- Regular & Manual Buy/Sell Transactions: 0.95%\n"
+            "- Limit Orders Buy/Sell Transactions: 1.125%\n\n"
+            f"Current Referrals: {referral_status['count']}\n"
+            f"Discounts: {referral_status['discounts']}\n"
+        )
 
-    # Prepare Refer message
-    refer_message = (
-        f"Your Referral Link: {referral_link}\n\n"
-        "Invite 20 friends and have each of them make a trade to receive 5% off Manual/Buy & Sell transaction fees and 10% off limit order transactions.\n\n"
-        "Trading bot fees after 20 referrals:\n"
-        "- Regular & Manual Buy/Sell Transactions: 0.95%\n"
-        "- Limit Orders Buy/Sell Transactions: 1.125%\n\n"
-        f"Current Referrals: {referral_status['count']}\n"
-        f"Discounts: {referral_status['discounts']}\n"
-    )
+        bot.send_message(chat_id, refer_message)
+    except Exception as e:
+        logger.error(f"Error in handle_refer_button: {e}")
+        bot.send_message(call.message.chat.id, "An error occurred while processing your request. Please try again later.")
 
-    bot.send_message(chat_id, refer_message)
+@bot.callback_query_handler(func=lambda call: call.data == "refresh")
+def handle_refresh_button(call):
+    try:
+        chat_id = call.message.chat.id
 
+        # Fetch updated balances and positions (replace with your logic)
+        sol_balance = get_sol_balance_function(chat_id)
+        sol_price = get_sol_price()
+        price_info_link = "https://www.coingecko.com/en/coins/solana"  # Link to SOL price info on CoinGecko
+
+        if sol_price is not None:
+            sol_price_message = f"*Current SOL Price*: ${sol_price} [Price Info]({price_info_link})\n"
+        else:
+            sol_price_message = "*Current SOL Price*: Failed to retrieve [Price Info]({price_info_link})\n"
+
+        # Prepare the refreshed home message
+        refresh_message = (
+            "*Welcome to OINKbot!*\nHere are your options:\n\n"
+            "*Main Menu:*\n"
+            "- [Social Media Links](your-link-here)\n"
+            "- [Referral Program](your-referral-link-here)\n"
+            "- *Your Wallet Address:* `Click to Copy`\n"
+            "- *Solana Balance & Price Tracker*\n"
+            f"{sol_price_message}"
+            f"Sol Balance: {sol_balance} SOL\n"
+        )
+
+        # Get the current message content and reply markup
+        current_message = call.message.text
+        current_reply_markup = call.message.reply_markup
+
+        # Only edit the message if the content or the reply markup has changed
+        if current_message != refresh_message or current_reply_markup != keyboard:
+            bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=refresh_message, reply_markup=keyboard, parse_mode='Markdown')
+        else:
+            bot.answer_callback_query(callback_query_id=call.id, text="Nothing to refresh. The content is already up-to-date.")
+    except Exception as e:
+        logger.error(f"Error in handle_refresh_button: {e}")
+        bot.send_message(call.message.chat.id, "An error occurred while processing your request. Please try again later.")
+
+@bot.callback_query_handler(func=lambda call: call.data == "close")
+def handle_close_button(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception as e:
+        logger.error(f"Failed to delete message: {e}")
+        bot.send_message(call.message.chat.id, "An error occurred while processing your request. Please try again later.")
+
+def get_token_info(token_address):
+    # Implement your logic to fetch token details and Dexscreener link
+    # Example API call (replace with actual data)
+    return {
+        "dexscreener_link": f"https://dexscreener.com/token/{token_address}"
+    }, f"https://dexscreener.com/token/{token_address}"
+
+def get_sol_price():
+    api_url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+    try:
+        response = requests.get(api_url)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        price_data = response.json()
+        sol_price = price_data['solana']['usd']
+        return sol_price
+    except requests.RequestException as e:
+        logger.error(f"Failed to retrieve SOL price: {e}")
+        return None
+
+def get_sol_balance_function(wallet_address):
+    # Example using Solana's JSON RPC API
+    api_url = "https://api.mainnet-beta.solana.com"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getBalance",
+        "params": [wallet_address]
+    }
+    try:
+        response = requests.post(api_url, headers=headers, json=payload)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        balance_data = response.json()
+        return balance_data.get("result", {}).get("value", 0) / 1e9  # Convert lamports to SOL
+    except requests.RequestException as e:
+        logger.error(f"Failed to retrieve SOL balance: {e}")
+        return 0
+
+def get_token_positions(wallet_address):
+    # Implement your logic to retrieve token positions
+    # Example positions list (replace with actual data)
+    return [
+        {"token": "TOKEN1", "amount": 100, "pnl": 10},
+        {"token": "TOKEN2", "amount": 200, "pnl": -5},
+    ]
 
 def get_user_referral_link(chat_id):
     # Implement your logic to retrieve the user's referral link
     # Example: Generate or fetch from database
-    return f"https://t.me/sol_oink_bot"
-
+    return f"https://yourapp.com/referral/{chat_id}"
 
 def get_user_referral_status(chat_id):
     # Implement your logic to retrieve the user's referral status
     # Example: Fetch from database
     return {
-        "count": 15,  # Example: User has 15 referrals
-        "discounts": {"manual_buy_sell": "1%", "limit_orders": "1.25%"},
+        "count": 5,
+        "discounts": "5% off Manual/Buy & Sell, 10% off limit order transactions"
     }
-
-
-def update_referral_status(chat_id):
-    referral_status = get_user_referral_status(chat_id)
-
-    # Update referral count
-    referral_status["count"] += 1
-
-    # Check if the user has 20 referrals
-    if referral_status["count"] >= 20:
-        referral_status["discounts"] = {
-            "manual_buy_sell": "0.95%",
-            "limit_orders": "1.125%",
-        }
-
-    # Save updated status (replace with your logic to save to database)
-    save_user_referral_status(chat_id, referral_status)
-
-
-def save_user_referral_status(chat_id, status):
-    # Implement your logic to save the user's referral status
-    pass
-
-
-# Example: After a successful referral
-chat_id = "user_chat_id"
-update_referral_status(chat_id)
 
 if __name__ == "__main__":
     bot.polling()
