@@ -428,5 +428,92 @@ def get_private_key(chat_id):
     return "your_private_key_here"
 
 
+@bot.callback_query_handler(func=lambda call: call.data == "help")
+def handle_help_button(call):
+    chat_id = call.message.chat.id
+
+    # Prepare Help Menu message
+    help_menu_message = (
+        "Help & FAQ\n\n"
+        "FAQ:\n"
+        "- How to use the bot?\n"
+        "  [Tutorial](your-tutorial-link-here)\n"
+        "- About the bot:\n"
+        "  OINKbot helps you manage your SOL assets with ease.\n"
+        "- Multi-Language setting:\n"
+        "  Currently supported languages: English, Spanish, French.\n"
+        "- AI support:\n"
+        "  Our AI support helps you with real-time queries.\n"
+        "- Trading Bot Fees:\n"
+        "  - Regular & Manual Buy/Sell Transactions: 1%\n"
+        "  - Limit Orders Buy/Sell Transactions: 1.25%\n"
+    )
+
+    # Add buttons for language settings and AI support
+    help_buttons = [
+        telebot.types.InlineKeyboardButton(
+            text="Change Language", callback_data="change_language"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="AI Support", callback_data="ai_support"
+        ),
+    ]
+    help_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+    help_keyboard.add(*help_buttons)
+
+    bot.send_message(
+        chat_id, help_menu_message, reply_markup=help_keyboard, parse_mode="Markdown"
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "change_language")
+def handle_change_language(call):
+    chat_id = call.message.chat.id
+
+    # Ask user to choose a language
+    language_buttons = [
+        telebot.types.InlineKeyboardButton(
+            text="English", callback_data="set_language_english"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="Spanish", callback_data="set_language_spanish"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="French", callback_data="set_language_french"
+        ),
+    ]
+    language_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+    language_keyboard.add(*language_buttons)
+
+    bot.send_message(chat_id, "Choose your language:", reply_markup=language_keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("set_language_"))
+def handle_set_language(call):
+    chat_id = call.message.chat.id
+    language = call.data.split("_")[-1]
+
+    # Implement your logic to set the language for the user
+    set_user_language(chat_id, language)
+
+    bot.send_message(chat_id, f"Language has been set to {language.capitalize()}.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "ai_support")
+def handle_ai_support(call):
+    chat_id = call.message.chat.id
+
+    # Implement your AI support logic here
+    bot.send_message(
+        chat_id,
+        "AI Support is here to help you with your queries. How can I assist you today?",
+    )
+
+
+def set_user_language(chat_id, language):
+    # Implement your logic to set the user's language preference
+    print(f"Setting language for chat ID {chat_id} to {language}")
+
+
 if __name__ == "__main__":
     bot.polling()
