@@ -54,7 +54,7 @@ def handle_token_address(message):
         bot.send_message(chat_id, "Invalid token address. Please try again.")
         return
 
-    # Fetch token details and Dexscreener link (replace with your logic)
+    # Fetch token details and Dexscreener link
     token_info, dexscreener_link = get_token_info(token_address)
 
     if token_info is None:
@@ -77,10 +77,110 @@ def handle_token_address(message):
     )
     buy_menu_message += "- Limit Order/Target Buy (coming soon)"
 
-    # Send Buy Menu message with inline keyboard (optional)
-    # You can add inline buttons for manual buy options here
-
     bot.send_message(chat_id, buy_menu_message, parse_mode='Markdown')
+
+@bot.callback_query_handler(func=lambda call: call.data == "sell")
+def handle_sell_button(call):
+    chat_id = call.message.chat.id
+
+    # Fetch token positions (replace with your logic)
+    positions = get_token_positions(chat_id)
+
+    # Prepare Sell & Manage Menu message
+    sell_menu_message = "Sell & Manage\n\n"
+    sell_menu_message += "Token Positions:\n"
+    for position in positions:
+        sell_menu_message += f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
+    sell_menu_message += "\nOpen Orders:\n"
+    sell_menu_message += "Limit Buy Orders:\n"
+    # Add logic to list limit buy orders
+    sell_menu_message += "Limit Sell Orders:\n"
+    # Add logic to list limit sell orders
+
+    # Add buttons for actions
+    sell_buttons = [
+        telebot.types.InlineKeyboardButton(text="Open Orders", callback_data="open_orders"),
+        telebot.types.InlineKeyboardButton(text="Change Order", callback_data="change_order"),
+        telebot.types.InlineKeyboardButton(text="Cancel Order", callback_data="cancel_order"),
+        telebot.types.InlineKeyboardButton(text="Sell", callback_data="sell_options"),
+    ]
+    sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+    sell_keyboard.add(*sell_buttons)
+
+    bot.send_message(chat_id, sell_menu_message, reply_markup=sell_keyboard)
+
+@bot.callback_query_handler(func=lambda call: call.data == "open_orders")
+def handle_open_orders(call):
+    chat_id = call.message.chat.id
+
+    # Fetch open orders (replace with your logic)
+    open_orders = get_open_orders(chat_id)
+
+    # Prepare Open Orders message
+    open_orders_message = "Open Orders:\n"
+    for order in open_orders:
+        open_orders_message += f"- {order['type']}: {order['amount']} @ {order['price']} (expires in {order['expiry']})\n"
+
+    bot.send_message(chat_id, open_orders_message)
+
+@bot.callback_query_handler(func=lambda call: call.data == "change_order")
+def handle_change_order(call):
+    chat_id = call.message.chat.id
+
+    # Ask user to select position to change
+    bot.send_message(chat_id, "Enter the token address of the position you want to change:")
+    bot.register_next_step_handler(call.message, handle_change_order_details)
+
+def handle_change_order_details(message):
+    chat_id = message.chat.id
+    token_address = message.text
+
+    # Ask for new expiration and order size
+    bot.send_message(chat_id, "Enter the new expiration time (e.g., 30m, 2h, 1d) and new order size (in SOL):")
+    bot.register_next_step_handler(message, finalize_change_order, token_address)
+
+def finalize_change_order(message, token_address):
+    chat_id = message.chat.id
+    details = message.text.split()
+    if len(details) != 2:
+        bot.send_message(chat_id, "Invalid format. Please provide expiration time and order size.")
+        return
+
+    expiration, order_size = details
+
+    # Implement your logic to change the order
+    change_order(token_address, expiration, order_size)
+
+    bot.send_message(chat_id, "Order updated successfully.")
+
+@bot.callback_query_handler(func=lambda call: call.data == "cancel_order")
+def handle_cancel_order(call):
+    chat_id = call.message.chat.id
+
+    # Ask user to select position to cancel
+    bot.send_message(chat_id, "Enter the token address of the position you want to cancel:")
+    bot.register_next_step_handler(call.message, finalize_cancel_order)
+
+def finalize_cancel_order(message):
+    chat_id = message.chat.id
+    token_address = message.text
+
+    # Implement your logic to cancel the order
+    cancel_order(token_address)
+
+    bot.send_message(chat_id, "Order canceled successfully.")
+
+@bot.callback_query_handler(func=lambda call: call.data == "sell_options")
+def handle_sell_options(call):
+    chat_id = call.message.chat.id
+
+    # Add sell options (e.g., sell 1 SOL, sell X SOL, sell all SOL)
+    sell_options_message = "Sell Options:\n"
+    sell_options_message += "- Sell 1 SOL\n"
+    sell_options_message += "- Sell X SOL (coming soon)\n"
+    sell_options_message += "- Sell all SOL\n"
+
+    bot.send_message(chat_id, sell_options_message)
 
 def is_valid_token_address(token_address):
     # Implement your logic to validate the token address
@@ -91,14 +191,14 @@ def is_valid_token_address(token_address):
 
 # Functions to retrieve token info, SOL balance, etc. (replace with your implementation)
 def get_token_info(token_address):
-    # Implement your logic to fetch token details and Dexscreener link
-    # Example API endpoint: "https://api.coingecko.com/api/v3/coins/{id}"
-    api_url = f"https://api.example.com/token/{token_address}"
+    # Example Dexscreener API endpoint
+    api_url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
     try:
         response = requests.get(api_url)
         response.raise_for_status()  # Raises an HTTPError for bad responses
         token_data = response.json()
-        dexscreener_link = token_data.get('dexscreener_link', 'No link available')
+        # Extract the link if available, otherwise use a default message
+        dexscreener_link = token_data.get('link', 'No link available')
         return token_data, dexscreener_link
     except requests.RequestException as e:
         print(f"Failed to retrieve token information: {e}")
@@ -115,14 +215,37 @@ def get_sol_balance_function(wallet_address):
         "params": [wallet_address]
     }
     try:
-        response = requests.post(api_url, json=payload, headers=headers)
-        response.raise_for_status()
+        response = requests.post(api_url, headers=headers, json=payload)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
         balance_data = response.json()
-        balance = balance_data.get('result', {}).get('value', 0) / 1e9  # Solana's balance is in lamports
-        return balance
+        return balance_data.get("result", {}).get("value", 0) / 1e9  # Convert lamports to SOL
     except requests.RequestException as e:
         print(f"Failed to retrieve SOL balance: {e}")
         return 0
+
+def get_token_positions(wallet_address):
+    # Implement your logic to retrieve token positions
+    # Example positions list (replace with actual data)
+    return [
+        {"token": "TOKEN1", "amount": 100, "pnl": 10},
+        {"token": "TOKEN2", "amount": 200, "pnl": -5},
+    ]
+
+def get_open_orders(wallet_address):
+    # Implement your logic to retrieve open orders
+    # Example open orders list (replace with actual data)
+    return [
+        {"type": "buy", "amount": 10, "price": 100, "expiry": "30m"},
+        {"type": "sell", "amount": 5, "price": 200, "expiry": "1h"},
+    ]
+
+def change_order(token_address, expiration, order_size):
+    # Implement your logic to change the order
+    print(f"Changing order for {token_address} to {expiration} and size {order_size}")
+
+def cancel_order(token_address):
+    # Implement your logic to cancel the order
+    print(f"Cancelling order for {token_address}")
 
 if __name__ == "__main__":
     bot.polling()
