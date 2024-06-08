@@ -23,6 +23,7 @@ buttons = [
 keyboard = telebot.types.InlineKeyboardMarkup(row_width=3)
 keyboard.add(*buttons)
 
+
 @bot.message_handler(commands=["start"])
 def start(message):
     chat_id = message.chat.id
@@ -35,7 +36,10 @@ def start(message):
         "- *Solana Balance & Price Tracker*\n"
         "- *Current SOL Price*: [Price Info](your-price-link-here)\n"
     )
-    bot.send_message(chat_id, welcome_message, reply_markup=keyboard, parse_mode='Markdown')
+    bot.send_message(
+        chat_id, welcome_message, reply_markup=keyboard, parse_mode="Markdown"
+    )
+
 
 @bot.callback_query_handler(func=lambda call: call.data == "buy")
 def handle_buy_button(call):
@@ -44,6 +48,7 @@ def handle_buy_button(call):
     # Prompt for token address
     bot.send_message(chat_id, "Enter the wallet address of the token you want to buy:")
     bot.register_next_step_handler(call.message, handle_token_address)
+
 
 def handle_token_address(message):
     chat_id = message.chat.id
@@ -58,7 +63,9 @@ def handle_token_address(message):
     token_info, dexscreener_link = get_token_info(token_address)
 
     if token_info is None:
-        bot.send_message(chat_id, "Failed to retrieve token information. Please try again.")
+        bot.send_message(
+            chat_id, "Failed to retrieve token information. Please try again."
+        )
         return
 
     # Fetch SOL balance (replace with your wallet address logic)
@@ -77,7 +84,8 @@ def handle_token_address(message):
     )
     buy_menu_message += "- Limit Order/Target Buy (coming soon)"
 
-    bot.send_message(chat_id, buy_menu_message, parse_mode='Markdown')
+    bot.send_message(chat_id, buy_menu_message, parse_mode="Markdown")
+
 
 @bot.callback_query_handler(func=lambda call: call.data == "sell")
 def handle_sell_button(call):
@@ -90,7 +98,9 @@ def handle_sell_button(call):
     sell_menu_message = "Sell & Manage\n\n"
     sell_menu_message += "Token Positions:\n"
     for position in positions:
-        sell_menu_message += f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
+        sell_menu_message += (
+            f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
+        )
     sell_menu_message += "\nOpen Orders:\n"
     sell_menu_message += "Limit Buy Orders:\n"
     # Add logic to list limit buy orders
@@ -99,15 +109,22 @@ def handle_sell_button(call):
 
     # Add buttons for actions
     sell_buttons = [
-        telebot.types.InlineKeyboardButton(text="Open Orders", callback_data="open_orders"),
-        telebot.types.InlineKeyboardButton(text="Change Order", callback_data="change_order"),
-        telebot.types.InlineKeyboardButton(text="Cancel Order", callback_data="cancel_order"),
+        telebot.types.InlineKeyboardButton(
+            text="Open Orders", callback_data="open_orders"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="Change Order", callback_data="change_order"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="Cancel Order", callback_data="cancel_order"
+        ),
         telebot.types.InlineKeyboardButton(text="Sell", callback_data="sell_options"),
     ]
     sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
     sell_keyboard.add(*sell_buttons)
 
     bot.send_message(chat_id, sell_menu_message, reply_markup=sell_keyboard)
+
 
 @bot.callback_query_handler(func=lambda call: call.data == "open_orders")
 def handle_open_orders(call):
@@ -123,27 +140,37 @@ def handle_open_orders(call):
 
     bot.send_message(chat_id, open_orders_message)
 
+
 @bot.callback_query_handler(func=lambda call: call.data == "change_order")
 def handle_change_order(call):
     chat_id = call.message.chat.id
 
     # Ask user to select position to change
-    bot.send_message(chat_id, "Enter the token address of the position you want to change:")
+    bot.send_message(
+        chat_id, "Enter the token address of the position you want to change:"
+    )
     bot.register_next_step_handler(call.message, handle_change_order_details)
+
 
 def handle_change_order_details(message):
     chat_id = message.chat.id
     token_address = message.text
 
     # Ask for new expiration and order size
-    bot.send_message(chat_id, "Enter the new expiration time (e.g., 30m, 2h, 1d) and new order size (in SOL):")
+    bot.send_message(
+        chat_id,
+        "Enter the new expiration time (e.g., 30m, 2h, 1d) and new order size (in SOL):",
+    )
     bot.register_next_step_handler(message, finalize_change_order, token_address)
+
 
 def finalize_change_order(message, token_address):
     chat_id = message.chat.id
     details = message.text.split()
     if len(details) != 2:
-        bot.send_message(chat_id, "Invalid format. Please provide expiration time and order size.")
+        bot.send_message(
+            chat_id, "Invalid format. Please provide expiration time and order size."
+        )
         return
 
     expiration, order_size = details
@@ -153,13 +180,17 @@ def finalize_change_order(message, token_address):
 
     bot.send_message(chat_id, "Order updated successfully.")
 
+
 @bot.callback_query_handler(func=lambda call: call.data == "cancel_order")
 def handle_cancel_order(call):
     chat_id = call.message.chat.id
 
     # Ask user to select position to cancel
-    bot.send_message(chat_id, "Enter the token address of the position you want to cancel:")
+    bot.send_message(
+        chat_id, "Enter the token address of the position you want to cancel:"
+    )
     bot.register_next_step_handler(call.message, finalize_cancel_order)
+
 
 def finalize_cancel_order(message):
     chat_id = message.chat.id
@@ -169,6 +200,7 @@ def finalize_cancel_order(message):
     cancel_order(token_address)
 
     bot.send_message(chat_id, "Order canceled successfully.")
+
 
 @bot.callback_query_handler(func=lambda call: call.data == "sell_options")
 def handle_sell_options(call):
@@ -182,12 +214,14 @@ def handle_sell_options(call):
 
     bot.send_message(chat_id, sell_options_message)
 
+
 def is_valid_token_address(token_address):
     # Implement your logic to validate the token address
     # Example: Check if the address length is correct and if it follows a specific format
-    if len(token_address) == 42 and token_address.startswith('0x'):
+    if len(token_address) == 42 and token_address.startswith("0x"):
         return True
     return False
+
 
 # Functions to retrieve token info, SOL balance, etc. (replace with your implementation)
 def get_token_info(token_address):
@@ -198,11 +232,12 @@ def get_token_info(token_address):
         response.raise_for_status()  # Raises an HTTPError for bad responses
         token_data = response.json()
         # Extract the link if available, otherwise use a default message
-        dexscreener_link = token_data.get('link', 'No link available')
+        dexscreener_link = token_data.get("link", "No link available")
         return token_data, dexscreener_link
     except requests.RequestException as e:
         print(f"Failed to retrieve token information: {e}")
         return None, None
+
 
 def get_sol_balance_function(wallet_address):
     # Example using Solana's JSON RPC API
@@ -212,16 +247,19 @@ def get_sol_balance_function(wallet_address):
         "jsonrpc": "2.0",
         "id": 1,
         "method": "getBalance",
-        "params": [wallet_address]
+        "params": [wallet_address],
     }
     try:
         response = requests.post(api_url, headers=headers, json=payload)
         response.raise_for_status()  # Raises an HTTPError for bad responses
         balance_data = response.json()
-        return balance_data.get("result", {}).get("value", 0) / 1e9  # Convert lamports to SOL
+        return (
+            balance_data.get("result", {}).get("value", 0) / 1e9
+        )  # Convert lamports to SOL
     except requests.RequestException as e:
         print(f"Failed to retrieve SOL balance: {e}")
         return 0
+
 
 def get_token_positions(wallet_address):
     # Implement your logic to retrieve token positions
@@ -231,6 +269,7 @@ def get_token_positions(wallet_address):
         {"token": "TOKEN2", "amount": 200, "pnl": -5},
     ]
 
+
 def get_open_orders(wallet_address):
     # Implement your logic to retrieve open orders
     # Example open orders list (replace with actual data)
@@ -239,13 +278,155 @@ def get_open_orders(wallet_address):
         {"type": "sell", "amount": 5, "price": 200, "expiry": "1h"},
     ]
 
+
 def change_order(token_address, expiration, order_size):
     # Implement your logic to change the order
     print(f"Changing order for {token_address} to {expiration} and size {order_size}")
 
+
 def cancel_order(token_address):
     # Implement your logic to cancel the order
     print(f"Cancelling order for {token_address}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "wallet")
+def handle_wallet_button(call):
+    chat_id = call.message.chat.id
+
+    # Fetch Oinkbot Wallet Address (replace with your logic)
+    oinkbot_wallet_address = get_oinkbot_wallet_address(chat_id)
+
+    # Prepare Wallet Menu message
+    wallet_menu_message = f"Oinkbot Wallet Address: {oinkbot_wallet_address}\n"
+    wallet_menu_message += (
+        "Viewable on [Solscan](https://solscan.io/account/your_wallet_address_here)\n"
+    )
+    wallet_menu_message += "Choose an option below:"
+
+    # Add buttons for wallet actions
+    wallet_buttons = [
+        telebot.types.InlineKeyboardButton(
+            text="Deposit SOL", callback_data="deposit_sol"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="Withdraw All SOL", callback_data="withdraw_all_sol"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="Withdraw X SOL", callback_data="withdraw_x_sol"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="Reset Wallet", callback_data="reset_wallet"
+        ),
+        telebot.types.InlineKeyboardButton(
+            text="Export Private Key", callback_data="export_private_key"
+        ),
+    ]
+    wallet_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+    wallet_keyboard.add(*wallet_buttons)
+
+    bot.send_message(
+        chat_id,
+        wallet_menu_message,
+        reply_markup=wallet_keyboard,
+        parse_mode="Markdown",
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "deposit_sol")
+def handle_deposit_sol(call):
+    chat_id = call.message.chat.id
+    bot.send_message(
+        chat_id,
+        "To deposit SOL, send SOL to the following address: your_deposit_wallet_address_here",
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "withdraw_all_sol")
+def handle_withdraw_all_sol(call):
+    chat_id = call.message.chat.id
+    bot.send_message(chat_id, "Enter the wallet address to withdraw all SOL to:")
+    bot.register_next_step_handler(call.message, finalize_withdraw_all_sol)
+
+
+def finalize_withdraw_all_sol(message):
+    chat_id = message.chat.id
+    withdraw_address = message.text
+
+    # Implement your logic to withdraw all SOL
+    withdraw_all_sol(withdraw_address)
+
+    bot.send_message(chat_id, "Withdrawal of all SOL initiated.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "withdraw_x_sol")
+def handle_withdraw_x_sol(call):
+    chat_id = call.message.chat.id
+    bot.send_message(
+        chat_id,
+        "Enter the wallet address and amount of SOL to withdraw (e.g., address 1.5):",
+    )
+    bot.register_next_step_handler(call.message, finalize_withdraw_x_sol)
+
+
+def finalize_withdraw_x_sol(message):
+    chat_id = message.chat.id
+    details = message.text.split()
+    if len(details) != 2:
+        bot.send_message(chat_id, "Invalid format. Please provide address and amount.")
+        return
+
+    withdraw_address, amount = details
+
+    # Implement your logic to withdraw X SOL
+    withdraw_x_sol(withdraw_address, float(amount))
+
+    bot.send_message(chat_id, f"Withdrawal of {amount} SOL initiated.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "reset_wallet")
+def handle_reset_wallet(call):
+    chat_id = call.message.chat.id
+
+    # Implement your logic to reset the wallet
+    reset_wallet(chat_id)
+
+    bot.send_message(chat_id, "Wallet has been reset.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "export_private_key")
+def handle_export_private_key(call):
+    chat_id = call.message.chat.id
+
+    # Fetch private key (replace with your logic)
+    private_key = get_private_key(chat_id)
+
+    bot.send_message(chat_id, f"Your private key: {private_key}")
+
+
+def get_oinkbot_wallet_address(wallet_address):
+    # Implement your logic to retrieve the Oinkbot wallet address
+    return "your_wallet_address_here"
+
+
+def withdraw_all_sol(withdraw_address):
+    # Implement your logic to withdraw all SOL
+    print(f"Withdrawing all SOL to {withdraw_address}")
+
+
+def withdraw_x_sol(withdraw_address, amount):
+    # Implement your logic to withdraw X SOL
+    print(f"Withdrawing {amount} SOL to {withdraw_address}")
+
+
+def reset_wallet(chat_id):
+    # Implement your logic to reset the wallet
+    print(f"Resetting wallet for chat ID {chat_id}")
+
+
+def get_private_key(chat_id):
+    # Implement your logic to retrieve the private key
+    return "your_private_key_here"
+
 
 if __name__ == "__main__":
     bot.polling()
