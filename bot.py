@@ -1,13 +1,17 @@
 from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get the token from environment variables
+TOKEN = "7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
+
+# Your bot setup and logic here
 import telebot
 import requests
 import sqlite3
 import logging
 from concurrent.futures import ThreadPoolExecutor
-
-# Load environment variables
-load_dotenv()
-TOKEN ="7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
 
 bot = telebot.TeleBot(TOKEN)
 executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent requests
