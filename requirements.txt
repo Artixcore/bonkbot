@@ -1,5 +1,5 @@
 pyTelegramBotAPI
 requests
-sqlite3
+db-sqlite3
 telebot
 python-dotenv
