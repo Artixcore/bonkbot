@@ -1,9 +1,12 @@
 version: '3.8'
 
 services:
-  telegram-bot:
+  oinkbot:
     build: .
-    environment:
-      TELEGRAM_BOT_TOKEN: 7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA
+    container_name: oinkbot_container
     ports:
-      - "8443:8443"
+      - "80:80"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/usr/src/app
