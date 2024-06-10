@@ -1,4 +1,5 @@
 import os
+import time
 import telebot
 import requests
 import sqlite3
@@ -188,8 +189,13 @@ def handle_buy_option(call):
         chat_id = call.message.chat.id
         token_address = call.data.split("_")[-1]
         amount = call.data.split("_")[1]
-        # Logic to handle the buying of the token
-        bot.send_message(chat_id, f"Buying {amount} SOL of token {token_address}")
+        
+        # Simulate the buy process with a delay
+        bot.send_message(chat_id, f"Initiating the purchase of {amount} SOL for token {token_address}. Please wait...")
+        time.sleep(5)  # Simulating delay for buy process
+        
+        # Simulate successful purchase
+        bot.send_message(chat_id, f"Successfully bought {amount} SOL of token {token_address}!")
     except Exception as e:
         logger.error(f"Error in handle_buy_option: {e}")
         bot.send_message(
