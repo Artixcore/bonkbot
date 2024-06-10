@@ -1,17 +1,15 @@
 from dotenv import load_dotenv
-
-# Load environment variables from .env file
 load_dotenv()
 
-# Get the token from environment variables
-TOKEN = "7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
 
-# Your bot setup and logic here
 import telebot
 import requests
 import sqlite3
 import logging
 from concurrent.futures import ThreadPoolExecutor
+
+# Load environment variables
+TOKEN = "7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
 
 bot = telebot.TeleBot(TOKEN)
 executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent requests
@@ -401,11 +399,19 @@ def handle_close_button(call):
 
 
 def get_token_info(token_address):
-    # Implement your logic to fetch token details and Dexscreener link
-    # Example API call (replace with actual data)
-    return {
-        "dexscreener_link": f"https://dexscreener.com/token/{token_address}"
-    }, f"https://dexscreener.com/token/{token_address}"
+    try:
+        dexscreener_link = f"https://dexscreener.com/token/{token_address}"
+        # Example of verifying the link by making a request (optional)
+        response = requests.get(dexscreener_link)
+        if response.status_code == 200:
+            logger.info(f"Dexscreener link for {token_address} is valid.")
+            return {"dexscreener_link": dexscreener_link}, dexscreener_link
+        else:
+            logger.error(f"Dexscreener link for {token_address} is invalid.")
+            return None, None
+    except Exception as e:
+        logger.error(f"Error in get_token_info: {e}")
+        return None, None
 
 
 def get_sol_price():
