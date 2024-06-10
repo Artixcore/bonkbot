@@ -16,7 +16,7 @@ executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent request
 # Define button labels and corresponding callback data
 buttons = [
     telebot.types.InlineKeyboardButton(text="       Buy🟢       ", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="       Sell & Manage 🔴         ", callback_data="sell"),
+    telebot.types.InlineKeyboardButton(text="Sell & Manage 🔴", callback_data="sell"),
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
@@ -266,20 +266,24 @@ def handle_refresh_token(call):
 
 
 def get_token_info(token_address):
-    # Mock response; replace with actual API call
-    token_info = {
-        "symbol": "MOSK",
-        "name": "Elan Mosk",
-        "price": 0.732,
-        "price_change_5m": -12.94,
-        "price_change_1h": 6.02,
-        "price_change_6h": -11.07,
-        "price_change_24h": float('nan'),  # Example NaN value
-        "market_cap": "$731.60K",
-        "price_impact": 3.64,
-    }
-    dexscreener_link = f"https://dexscreener.com/token/{token_address}"
-    return token_info, dexscreener_link
+    try:
+        # Mock response; replace with actual API call
+        token_info = {
+            "symbol": "MOSK",
+            "name": "Elan Mosk",
+            "price": 0.732,
+            "price_change_5m": -12.94,
+            "price_change_1h": 6.02,
+            "price_change_6h": -11.07,
+            "price_change_24h": float('nan'),  # Example NaN value
+            "market_cap": "$731.60K",
+            "price_impact": 3.64,
+        }
+        dexscreener_link = f"https://dexscreener.com/token/{token_address}"
+        return token_info, dexscreener_link
+    except Exception as e:
+        logger.error(f"Error fetching token info: {e}")
+        return None, None
 
 
 def get_sol_price():
@@ -298,7 +302,6 @@ def get_sol_price():
 
 
 def get_sol_balance_function(wallet_address):
-    # Example using Solana's JSON RPC API
     api_url = "https://api.mainnet-beta.solana.com"
     headers = {"Content-Type": "application/json"}
     payload = {
