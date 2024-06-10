@@ -346,7 +346,10 @@ def handle_refresh_button(call):
                 text="Nothing to refresh. The content is already up-to-date.",
             )
     except telebot.apihelper.ApiException as e:
-        if "message is not modified" in str(e):
+        if (
+            e.result.status_code == 400
+            and "message is not modified" in e.result.json()["description"]
+        ):
             bot.answer_callback_query(
                 callback_query_id=call.id,
                 text="Nothing to refresh. The content is already up-to-date.",
