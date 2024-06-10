@@ -1,8 +1,8 @@
+from dotenv import load_dotenv
 import telebot
 import requests
 import sqlite3
 import logging
-from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
 
 # Load environment variables
