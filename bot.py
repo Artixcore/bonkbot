@@ -20,7 +20,7 @@ executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent request
 # Define button labels and corresponding callback data
 buttons = [
     telebot.types.InlineKeyboardButton(text="       Buy🟢       ", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="Sell & Manage 🔴", callback_data="sell"),
+    telebot.types.InlineKeyboardButton(text="       Sell & Manage 🔴          ", callback_data="sell"),
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
