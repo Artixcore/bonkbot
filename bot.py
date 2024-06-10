@@ -1,4 +1,3 @@
-import os
 import time
 import telebot
 import requests
@@ -9,28 +8,32 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Load environment variables
 load_dotenv()
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+TOKEN = "7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
 
 bot = telebot.TeleBot(TOKEN)
 executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent requests
 
 # Define button labels and corresponding callback data
-buttons = [
-    telebot.types.InlineKeyboardButton(text="       Buy🟢       ", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="Sell & Manage 🔴", callback_data="sell"),
+top_buttons = [
+    telebot.types.InlineKeyboardButton(text="Buy🟢", callback_data="buy"),
+    telebot.types.InlineKeyboardButton(text="Sell & Manage 🔴", callback_data="sell")
+]
+
+other_buttons = [
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
     telebot.types.InlineKeyboardButton(text="Wallet 👛", callback_data="wallet"),
     telebot.types.InlineKeyboardButton(text="Settings ⚙️", callback_data="settings"),
     telebot.types.InlineKeyboardButton(text="Refresh 🔄", callback_data="refresh"),
-    telebot.types.InlineKeyboardButton(text="Close", callback_data="close"),
+    telebot.types.InlineKeyboardButton(text="Close", callback_data="close")
 ]
 
-# Create a 3x3 inline keyboard layout with adjusted spacing for the first row
-keyboard = telebot.types.InlineKeyboardMarkup(row_width=3)
-keyboard.add(*buttons[:3])
-keyboard.add(*buttons[3:])
+# Create inline keyboard layout
+keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+keyboard.add(*top_buttons)
+keyboard.add(*other_buttons)
 
 # Set up logging
 logging.basicConfig(
@@ -192,8 +195,11 @@ def handle_buy_option(call):
         
         # Simulate the buy process with a delay
         bot.send_message(chat_id, f"Initiating the purchase of {amount} SOL for token {token_address}. Please wait...")
-        time.sleep(5)  # Simulating delay for buy process
-        
+
+        for i in range(3):
+            time.sleep(1)
+            bot.send_message(chat_id, f"Processing... ({i+1}/3)")
+
         # Simulate successful purchase
         bot.send_message(chat_id, f"Successfully bought {amount} SOL of token {token_address}!")
     except Exception as e:
@@ -220,7 +226,7 @@ def handle_cancel_buy(call):
 def handle_refresh_token(call):
     try:
         chat_id = call.message.chat.id
-        token_address = call.data.split("_")[-1]
+        token_address = call.data.split
         token_info, dexscreener_link = get_token_info(token_address)
 
         if token_info is None:
