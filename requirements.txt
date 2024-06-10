@@ -2,4 +2,4 @@ pyTelegramBotAPI
 requests
 sqlite3
 telebot
-logging
+python-dotenv

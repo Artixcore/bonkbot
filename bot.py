@@ -2,10 +2,15 @@ import telebot
 import requests
 import sqlite3
 import logging
+from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
 
-token = "7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
+# Load environment variables
+load_dotenv()
+TOKEN ="7193109031:AAGnoS9jC6WrQf22yCuiF5DzNH0aFgen4DA"
 
-bot = telebot.TeleBot(token)
+bot = telebot.TeleBot(TOKEN)
+executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent requests
 
 # Define button labels and corresponding callback data
 buttons = [
@@ -22,15 +27,14 @@ buttons = [
 
 # Create a 3x3 inline keyboard layout with adjusted spacing for the first row
 keyboard = telebot.types.InlineKeyboardMarkup(row_width=3)
-keyboard.add(*buttons[:2])
-keyboard.add(*buttons[2:])
+keyboard.add(*buttons[:3])
+keyboard.add(*buttons[3:])
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
 
 # Database setup
 def create_database():
@@ -80,14 +84,13 @@ def start(message):
         chat_id = message.chat.id
         sol_price = get_sol_price()
         sol_balance = get_sol_balance_function(chat_id)
-        price_info_link = "https://www.coingecko.com/en/coins/solana"  # Link to SOL price info on CoinGecko
+        price_info_link = "https://www.coingecko.com/en/coins/solana"
 
-        if sol_price is not None:
-            sol_price_message = (
-                f"*Current SOL Price*: ${sol_price} [Price Info]({price_info_link})\n"
-            )
-        else:
-            sol_price_message = "*Current SOL Price*: Failed to retrieve [Price Info]({price_info_link})\n"
+        sol_price_message = (
+            f"*Current SOL Price*: ${sol_price} [Price Info]({price_info_link})\n"
+            if sol_price is not None
+            else "*Current SOL Price*: Failed to retrieve [Price Info]({price_info_link})\n"
+        )
 
         welcome_message = (
             "*Welcome to OINKbot!*\nHere are your options:\n\n"
@@ -127,6 +130,10 @@ def handle_buy_button(call):
 
 
 def handle_token_address(message):
+    executor.submit(process_token_address, message)
+
+
+def process_token_address(message):
     try:
         chat_id = message.chat.id
         token_address = message.text
@@ -164,6 +171,10 @@ def handle_token_address(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == "sell")
 def handle_sell_button(call):
+    executor.submit(process_sell_button, call)
+
+
+def process_sell_button(call):
     try:
         chat_id = call.message.chat.id
         positions = get_token_positions(chat_id)
@@ -210,6 +221,10 @@ def handle_sell_button(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "refresh_sell_manage")
 def handle_refresh_sell_manage(call):
+    executor.submit(process_refresh_sell_manage, call)
+
+
+def process_refresh_sell_manage(call):
     try:
         chat_id = call.message.chat.id
         positions = get_token_positions(chat_id)
@@ -273,6 +288,10 @@ def handle_refresh_sell_manage(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "refer")
 def handle_refer_button(call):
+    executor.submit(process_refer_button, call)
+
+
+def process_refer_button(call):
     try:
         chat_id = call.message.chat.id
         referral_link = get_user_referral_link(chat_id)
@@ -300,20 +319,23 @@ def handle_refer_button(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "refresh")
 def handle_refresh_button(call):
+    executor.submit(process_refresh_button, call)
+
+
+def process_refresh_button(call):
     try:
         chat_id = call.message.chat.id
 
         # Fetch updated balances and positions (replace with your logic)
         sol_balance = get_sol_balance_function(chat_id)
         sol_price = get_sol_price()
-        price_info_link = "https://www.coingecko.com/en/coins/solana"  # Link to SOL price info on CoinGecko
+        price_info_link = "https://www.coingecko.com/en/coins/solana"
 
-        if sol_price is not None:
-            sol_price_message = (
-                f"*Current SOL Price*: ${sol_price} [Price Info]({price_info_link})\n"
-            )
-        else:
-            sol_price_message = "*Current SOL Price*: Failed to retrieve [Price Info]({price_info_link})\n"
+        sol_price_message = (
+            f"*Current SOL Price*: ${sol_price} [Price Info]({price_info_link})\n"
+            if sol_price is not None
+            else "*Current SOL Price*: Failed to retrieve [Price Info]({price_info_link})\n"
+        )
 
         # Prepare the refreshed home message
         refresh_message = (
