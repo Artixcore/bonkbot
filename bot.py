@@ -1,18 +1,14 @@
 import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Get the token from environment variables
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-
-# Your bot setup and logic here
 import telebot
 import requests
 import sqlite3
 import logging
+from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
+
+# Load environment variables
+load_dotenv()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 bot = telebot.TeleBot(TOKEN)
 executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent requests
@@ -20,7 +16,7 @@ executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent request
 # Define button labels and corresponding callback data
 buttons = [
     telebot.types.InlineKeyboardButton(text="       Buy🟢       ", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="       Sell & Manage 🔴          ", callback_data="sell"),
+    telebot.types.InlineKeyboardButton(text="       Sell & Manage 🔴         ", callback_data="sell"),
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
@@ -151,246 +147,59 @@ def process_token_address(message):
             return
 
         sol_balance = get_sol_balance_function(chat_id)
-        buy_menu_message = f"Sol Balance: {sol_balance} SOL\n"
-        buy_menu_message += f"Dexscreener: [Dexscreener]({dexscreener_link})\n"
-        buy_menu_message += (
-            f"- Birdeye: [Birdeye Link](https://birdeye.com/{token_address})\n"
-        )
-        buy_menu_message += (
-            f"- Rugcheck: [Rugcheck Link](https://rugcheck.io/{token_address})\n"
-        )
-        buy_menu_message += "Buy Options:\n"
-        buy_menu_message += (
-            "- Manual Buy: \n  - .5 SOL\n  - 1 SOL\n  - Buy X SOL (coming soon)\n"
-        )
-        buy_menu_message += "- Limit Order/Target Buy (coming soon)"
 
-        bot.send_message(chat_id, buy_menu_message, parse_mode="Markdown")
+        token_details_message = (
+            f"{token_info['symbol']} | {token_info['name']} | {token_address}\n\n"
+            f"Price: ${token_info['price']}\n"
+            f"5m: {token_info['price_change_5m']}%, 1h: {token_info['price_change_1h']}%, "
+            f"6h: {token_info['price_change_6h']}%, 24h: {token_info['price_change_24h']}%\n"
+            f"Market Cap: {token_info['market_cap']}\n\n"
+            f"Price Impact (5.0000 SOL): {token_info['price_impact']}%\n\n"
+            f"Wallet Balance: {sol_balance} SOL\n"
+            "To buy, press one of the buttons below."
+        )
+
+        # Define buttons
+        buy_buttons = [
+            telebot.types.InlineKeyboardButton(text="Cancel", callback_data="cancel_buy"),
+            telebot.types.InlineKeyboardButton(text="Explorer", url=f"https://explorer.solana.com/address/{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Birdeye", url=f"https://birdeye.so/token/{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Scan", url=f"https://solscan.io/token/{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Buy 1.0 SOL", callback_data=f"buy_1_{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Buy 5.0 SOL", callback_data=f"buy_5_{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Buy X SOL", callback_data=f"buy_x_{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Refresh", callback_data=f"refresh_token_{token_address}"),
+        ]
+        buy_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+        buy_keyboard.add(*buy_buttons)
+
+        bot.send_message(chat_id, token_details_message, reply_markup=buy_keyboard, parse_mode="Markdown")
     except Exception as e:
-        logger.error(f"Error in handle_token_address: {e}")
+        logger.error(f"Error in process_token_address: {e}")
         bot.send_message(
             message.chat.id,
             "An error occurred while processing your request. Please try again later.",
         )
 
 
-@bot.callback_query_handler(func=lambda call: call.data == "sell")
-def handle_sell_button(call):
-    executor.submit(process_sell_button, call)
-
-
-def process_sell_button(call):
+@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
+def handle_buy_option(call):
     try:
         chat_id = call.message.chat.id
-        positions = get_token_positions(chat_id)
-
-        sell_menu_message = "Sell & Manage\n\n"
-        sell_menu_message += "Token Positions:\n"
-        for position in positions:
-            sell_menu_message += f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
-        sell_menu_message += "\nOpen Orders:\n"
-        sell_menu_message += "Limit Buy Orders:\n"
-        # Add logic to list limit buy orders
-        sell_menu_message += "Limit Sell Orders:\n"
-        # Add logic to list limit sell orders
-
-        sell_buttons = [
-            telebot.types.InlineKeyboardButton(
-                text="Open Orders", callback_data="open_orders"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Change Order", callback_data="change_order"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Cancel Order", callback_data="cancel_order"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Sell", callback_data="sell_options"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Refresh", callback_data="refresh_sell_manage"
-            ),
-            telebot.types.InlineKeyboardButton(text="Close", callback_data="close"),
-        ]
-        sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
-        sell_keyboard.add(*sell_buttons)
-
-        bot.send_message(chat_id, sell_menu_message, reply_markup=sell_keyboard)
+        token_address = call.data.split("_")[-1]
+        amount = call.data.split("_")[1]
+        # Logic to handle the buying of the token
+        bot.send_message(chat_id, f"Buying {amount} SOL of token {token_address}")
     except Exception as e:
-        logger.error(f"Error in handle_sell_button: {e}")
+        logger.error(f"Error in handle_buy_option: {e}")
         bot.send_message(
-            call.message.chat.id,
+            chat_id,
             "An error occurred while processing your request. Please try again later.",
         )
 
 
-@bot.callback_query_handler(func=lambda call: call.data == "refresh_sell_manage")
-def handle_refresh_sell_manage(call):
-    executor.submit(process_refresh_sell_manage, call)
-
-
-def process_refresh_sell_manage(call):
-    try:
-        chat_id = call.message.chat.id
-        positions = get_token_positions(chat_id)
-
-        sell_menu_message = "Sell & Manage\n\n"
-        sell_menu_message += "Token Positions:\n"
-        for position in positions:
-            sell_menu_message += f"- {position['token']}: {position['amount']} (P&L: {position['pnl']})\n"
-        sell_menu_message += "\nOpen Orders:\n"
-        sell_menu_message += "Limit Buy Orders:\n"
-        # Add logic to list limit buy orders
-        sell_menu_message += "Limit Sell Orders:\n"
-        # Add logic to list limit sell orders
-
-        sell_buttons = [
-            telebot.types.InlineKeyboardButton(
-                text="Open Orders", callback_data="open_orders"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Change Order", callback_data="change_order"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Cancel Order", callback_data="cancel_order"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Sell", callback_data="sell_options"
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="Refresh", callback_data="refresh_sell_manage"
-            ),
-            telebot.types.InlineKeyboardButton(text="Close", callback_data="close"),
-        ]
-        sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
-        sell_keyboard.add(*sell_buttons)
-
-        current_message = call.message.text
-        current_reply_markup = call.message.reply_markup
-
-        if (
-            current_message != sell_menu_message
-            or current_reply_markup != sell_keyboard
-        ):
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=call.message.message_id,
-                text=sell_menu_message,
-                reply_markup=sell_keyboard,
-            )
-        else:
-            bot.answer_callback_query(
-                callback_query_id=call.id,
-                text="Nothing to refresh. The content is already up-to-date.",
-            )
-    except Exception as e:
-        logger.error(f"Error in handle_refresh_sell_manage: {e}")
-        bot.send_message(
-            call.message.chat.id,
-            "An error occurred while processing your request. Please try again later.",
-        )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "refer")
-def handle_refer_button(call):
-    executor.submit(process_refer_button, call)
-
-
-def process_refer_button(call):
-    try:
-        chat_id = call.message.chat.id
-        referral_link = get_user_referral_link(chat_id)
-        referral_status = get_user_referral_status(chat_id)
-
-        refer_message = (
-            "Your Referral Link:\n"
-            f"{referral_link}\n\n"
-            "Invite 20 friends and have each of them make a trade to receive 5% off Manual/Buy & Sell transaction fees and 10% off limit order transactions.\n\n"
-            "Trading bot fees after 20 referrals:\n"
-            "- Regular & Manual Buy/Sell Transactions: 0.95%\n"
-            "- Limit Orders Buy/Sell Transactions: 1.125%\n\n"
-            f"Current Referrals: {referral_status['count']}\n"
-            f"Discounts: {referral_status['discounts']}\n"
-        )
-
-        bot.send_message(chat_id, refer_message)
-    except Exception as e:
-        logger.error(f"Error in handle_refer_button: {e}")
-        bot.send_message(
-            call.message.chat.id,
-            "An error occurred while processing your request. Please try again later.",
-        )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "refresh")
-def handle_refresh_button(call):
-    executor.submit(process_refresh_button, call)
-
-
-def process_refresh_button(call):
-    try:
-        chat_id = call.message.chat.id
-
-        # Fetch updated balances and positions (replace with your logic)
-        sol_balance = get_sol_balance_function(chat_id)
-        sol_price = get_sol_price()
-        price_info_link = "https://www.coingecko.com/en/coins/solana"
-
-        sol_price_message = (
-            f"*Current SOL Price*: ${sol_price} [Price Info]({price_info_link})\n"
-            if sol_price is not None
-            else "*Current SOL Price*: Failed to retrieve [Price Info]({price_info_link})\n"
-        )
-
-        # Prepare the refreshed home message
-        refresh_message = (
-            "*Welcome to OINKbot!*\nHere are your options:\n\n"
-            "*Main Menu:*\n"
-            "- [Social Media Links](your-link-here)\n"
-            "- [Referral Program](your-referral-link-here)\n"
-            "- *Your Wallet Address:* `Click to Copy`\n"
-            "- *Solana Balance & Price Tracker*\n"
-            f"{sol_price_message}"
-            f"Sol Balance: {sol_balance} SOL\n"
-        )
-
-        # Get the current message content and reply markup
-        current_message = call.message.text
-        current_reply_markup = call.message.reply_markup
-
-        # Only edit the message if the content or the reply markup has changed
-        if current_message != refresh_message or current_reply_markup != keyboard:
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=call.message.message_id,
-                text=refresh_message,
-                reply_markup=keyboard,
-                parse_mode="Markdown",
-            )
-        else:
-            bot.answer_callback_query(
-                callback_query_id=call.id,
-                text="Nothing to refresh. The content is already up-to-date.",
-            )
-    except telebot.apihelper.ApiException as e:
-        if (
-            e.result.status_code == 400
-            and "message is not modified" in e.result.json()["description"]
-        ):
-            bot.answer_callback_query(
-                callback_query_id=call.id,
-                text="Nothing to refresh. The content is already up-to-date.",
-            )
-        else:
-            logger.error(f"Error in handle_refresh_button: {e}")
-            bot.send_message(
-                call.message.chat.id,
-                "An error occurred while processing your request. Please try again later.",
-            )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == "close")
-def handle_close_button(call):
+@bot.callback_query_handler(func=lambda call: call.data == "cancel_buy")
+def handle_cancel_buy(call):
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception as e:
@@ -401,12 +210,76 @@ def handle_close_button(call):
         )
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith("refresh_token_"))
+def handle_refresh_token(call):
+    try:
+        chat_id = call.message.chat.id
+        token_address = call.data.split("_")[-1]
+        token_info, dexscreener_link = get_token_info(token_address)
+
+        if token_info is None:
+            bot.send_message(
+                chat_id, "Failed to retrieve token information. Please try again."
+            )
+            return
+
+        sol_balance = get_sol_balance_function(chat_id)
+
+        token_details_message = (
+            f"{token_info['symbol']} | {token_info['name']} | {token_address}\n\n"
+            f"Price: ${token_info['price']}\n"
+            f"5m: {token_info['price_change_5m']}%, 1h: {token_info['price_change_1h']}%, "
+            f"6h: {token_info['price_change_6h']}%, 24h: {token_info['price_change_24h']}%\n"
+            f"Market Cap: {token_info['market_cap']}\n\n"
+            f"Price Impact (5.0000 SOL): {token_info['price_impact']}%\n\n"
+            f"Wallet Balance: {sol_balance} SOL\n"
+            "To buy, press one of the buttons below."
+        )
+
+        # Define buttons
+        buy_buttons = [
+            telebot.types.InlineKeyboardButton(text="Cancel", callback_data="cancel_buy"),
+            telebot.types.InlineKeyboardButton(text="Explorer", url=f"https://explorer.solana.com/address/{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Birdeye", url=f"https://birdeye.so/token/{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Scan", url=f"https://solscan.io/token/{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Buy 1.0 SOL", callback_data=f"buy_1_{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Buy 5.0 SOL", callback_data=f"buy_5_{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Buy X SOL", callback_data=f"buy_x_{token_address}"),
+            telebot.types.InlineKeyboardButton(text="Refresh", callback_data=f"refresh_token_{token_address}"),
+        ]
+        buy_keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
+        buy_keyboard.add(*buy_buttons)
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=token_details_message,
+            reply_markup=buy_keyboard,
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"Error in handle_refresh_token: {e}")
+        bot.send_message(
+            call.message.chat.id,
+            "An error occurred while processing your request. Please try again later.",
+        )
+
+
 def get_token_info(token_address):
-    # Implement your logic to fetch token details and Dexscreener link
-    # Example API call (replace with actual data)
-    return {
-        "dexscreener_link": f"https://dexscreener.com/token/{token_address}"
-    }, f"https://dexscreener.com/token/{token_address}"
+    # Mock response; replace with actual API call
+    token_info = {
+        "symbol": "MOSK",
+        "name": "Elan Mosk",
+        "price": 0.732,
+        "price_change_5m": -12.94,
+        "price_change_1h": 6.02,
+        "price_change_6h": -11.07,
+        "price_change_24h": float('nan'),  # Example NaN value
+        "market_cap": "$731.60K",
+        "price_impact": 3.64,
+    }
+    dexscreener_link = f"https://dexscreener.com/token/{token_address}"
+    return token_info, dexscreener_link
 
 
 def get_sol_price():
@@ -456,18 +329,46 @@ def get_token_positions(wallet_address):
 
 
 def get_user_referral_link(chat_id):
-    # Implement your logic to retrieve the user's referral link
-    # Example: Generate or fetch from database
-    return f"https://yourapp.com/referral/{chat_id}"
+    # Retrieve the user's referral link
+    conn = sqlite3.connect("referrals.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT referral_count FROM user_referrals WHERE chat_id = ?",
+        (chat_id,),
+    )
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return f"https://yourapp.com/referral/{chat_id}"
+    else:
+        return None
 
 
-def get_user_referral_status(chat_id):
-    # Implement your logic to retrieve the user's referral status
-    # Example: Fetch from database
-    return {
-        "count": 5,
-        "discounts": "5% off Manual/Buy & Sell, 10% off limit order transactions",
-    }
+@bot.callback_query_handler(func=lambda call: call.data == "refer")
+def handle_refer_button(call):
+    try:
+        chat_id = call.message.chat.id
+        referral_link = get_user_referral_link(chat_id)
+        referral_status = get_user_referral_status(chat_id)
+
+        if referral_link:
+            refer_message = (
+                "Your Referral Link:\n"
+                f"{referral_link}\n\n"
+                "Invite friends to earn rewards!\n\n"
+                f"Current Referrals: {referral_status['count']}\n"
+                f"Discounts: {referral_status['discounts']}\n"
+            )
+        else:
+            refer_message = "You don't have a referral link yet. Start using the bot to generate one!"
+
+        bot.send_message(chat_id, refer_message)
+    except Exception as e:
+        logger.error(f"Error in handle_refer_button: {e}")
+        bot.send_message(
+            call.message.chat.id,
+            "An error occurred while processing your request. Please try again later.",
+        )
 
 
 if __name__ == "__main__":

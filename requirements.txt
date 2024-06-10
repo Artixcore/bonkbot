@@ -1,5 +1,5 @@
-pyTelegramBotAPI==1.0.0
-requests==1.0.0
-db-sqlite3==1.0.0
-telebot==1.0.0
-python-dotenv==1.0.0
+pyTelegramBotAPI
+requests
+db-sqlite3
+telebot
+python-dotenv
