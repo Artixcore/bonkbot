@@ -343,6 +343,11 @@ def get_token_positions(wallet_address):
         {"token": "TOKEN2", "amount": 200, "pnl": -5},
     ]
 
+def show_progress(chat_id, steps=3, interval=1):
+    for i in range(steps):
+        time.sleep(interval)
+        bot.send_message(chat_id, f"Processing... ({i+1}/{steps})")
+
 @bot.callback_query_handler(func=lambda call: call.data == "sell_manage")
 def handle_sell_manage_button(call):
     chat_id = call.message.chat.id
@@ -375,24 +380,48 @@ def handle_sell_manage_button(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sell_"))
 def handle_sell_token(call):
-    chat_id = call.message.chat.id
+    chat_id = call.message.chat_id
     data = call.data.split("_")
     token_address = data[1]
     amount = int(data[2])
 
-    # Simulate selling the token (replace with actual logic)
+    # Show progress bar before selling
     show_progress(chat_id)
-    bot.send_message(chat_id, f"Successfully sold {amount} {token_address}!")
 
-    # Update user tokens table (remove sold token)
-    conn = sqlite3.connect("referrals.db")
-    c = conn.cursor()
-    c.execute(
-        "DELETE FROM user_tokens WHERE chat_id = ? AND token_address = ?",
-        (chat_id, token_address),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        # Simulate selling the token (replace with actual logic)
+        # This part might involve interacting with an exchange API
+        # and could potentially raise exceptions
+        sell_response = sell_token(token_address, amount)  # Replace with actual sell function
+
+        if sell_response["success"]:
+            bot.send_message(chat_id, f"Successfully sold {amount} {token_address}!")
+        else:
+            error_message = sell_response["error_message"]
+            bot.send_message(chat_id, f"Sell failed: {error_message}")
+
+        # Update user tokens table (remove sold token)
+        conn = sqlite3.connect("referrals.db")
+        c = conn.cursor()
+        c.execute(
+            "DELETE FROM user_tokens WHERE chat_id = ? AND token_address = ?",
+            (chat_id, token_address),
+        )
+        conn.commit()
+        conn.close()
+
+    except Exception as e:
+        logging.error(f"Error selling token: {e}")
+        bot.send_message(chat_id, "An error occurred while selling the token. Please try again later.")
+
+
+# This function is a placeholder, replace it with your actual logic for selling tokens
+def sell_token(token_address, amount):
+    # Simulate successful sell
+    return {"success": True}
+
+    # Example of simulating a failed sell with an error message
+    # return {"success": False, "error_message": "Insufficient balance"}
 
 def get_user_referral_link(chat_id):
     # Retrieve the user's referral link
