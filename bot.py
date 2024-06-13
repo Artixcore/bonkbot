@@ -62,6 +62,25 @@ def add_user_referral(chat_id, referral_count, discount_text):
     conn.commit()
     conn.close()
 
+def add_user_token(chat_id, token_address, amount):
+    conn = sqlite3.connect("referrals.db")
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO user_tokens (chat_id, token_address, amount) VALUES (?, ?, ?)",
+        (chat_id, token_address, amount),
+    )
+    conn.commit()
+    conn.close()
+
+def get_user_tokens(chat_id):
+    conn = sqlite3.connect("referrals.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT token_address, amount FROM user_tokens WHERE chat_id = ?", (chat_id,)
+    )
+    rows = c.fetchall()
+    conn.close()
+    return rows
 
 def get_user_referral_status(chat_id):
     conn = sqlite3.connect("referrals.db")
@@ -316,6 +335,56 @@ def get_token_positions(wallet_address):
         {"token": "TOKEN2", "amount": 200, "pnl": -5},
     ]
 
+@bot.callback_query_handler(func=lambda call: call.data == "sell_manage")
+def handle_sell_manage_button(call):
+    chat_id = call.message.chat.id
+    user_tokens = get_user_tokens(chat_id)
+
+    if not user_tokens:
+        bot.send_message(chat_id, "You don't have any tokens to sell or manage yet.")
+        return
+
+    # Create a message with list of user tokens and buttons
+    message = "Your Tokens:\n\n"
+    for token_address, amount in user_tokens:
+        message += f"- {token_address} ({amount})\n"
+
+    sell_buttons = [
+        telebot.types.InlineKeyboardButton(text="Back", callback_data="back_to_main"),
+    ]
+    for token_address, amount in user_tokens:
+        sell_buttons.append(
+            telebot.types.InlineKeyboardButton(
+                text=f"Sell {amount} {token_address}",
+                callback_data=f"sell_{token_address}_{amount}",
+            )
+        )
+    sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+    sell_keyboard.add(*sell_buttons)
+
+    bot.send_message(chat_id, message, reply_markup=sell_keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("sell_"))
+def handle_sell_token(call):
+    chat_id = call.message.chat.id
+    data = call.data.split("_")
+    token_address = data[1]
+    amount = int(data[2])
+
+    # Simulate selling the token (replace with actual logic)
+    show_progress(chat_id)
+    bot.send_message(chat_id, f"Successfully sold {amount} {token_address}!")
+
+    # Update user tokens table (remove sold token)
+    conn = sqlite3.connect("referrals.db")
+    c = conn.cursor()
+    c.execute(
+        "DELETE FROM user_tokens WHERE chat_id = ? AND token_address = ?",
+        (chat_id, token_address),
+    )
+    conn.commit()
+    conn.close()
 
 def get_user_referral_link(chat_id):
     # Retrieve the user's referral link
