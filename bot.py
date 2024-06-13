@@ -23,9 +23,15 @@ other_buttons = [
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
+]
+
+other_buttons_2 = [
     telebot.types.InlineKeyboardButton(text="Wallet 👛", callback_data="wallet"),
     telebot.types.InlineKeyboardButton(text="Settings ⚙️", callback_data="settings"),
     telebot.types.InlineKeyboardButton(text="Refresh 🔄", callback_data="refresh"),
+]
+
+other_buttons_3 = [
     telebot.types.InlineKeyboardButton(text="Close", callback_data="close")
 ]
 
@@ -33,6 +39,8 @@ other_buttons = [
 keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
 keyboard.add(*top_buttons)
 keyboard.add(*other_buttons)
+keyboard.add(*other_buttons_2)
+keyboard.add(*other_buttons_3)
 
 # Set up logging
 logging.basicConfig(
