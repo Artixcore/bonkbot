@@ -16,31 +16,33 @@ executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent request
 # Define button labels and corresponding callback data
 top_buttons = [
     telebot.types.InlineKeyboardButton(text="Buy🟢", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="Sell & Manage 🔴", callback_data="sell")
+    telebot.types.InlineKeyboardButton(text="Sell & Manage ", callback_data="sell"),
 ]
 
 other_buttons = [
     telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
-    telebot.types.InlineKeyboardButton(text="Wallet 👛", callback_data="wallet"),
+    telebot.types.InlineKeyboardButton(text="Wallet ", callback_data="wallet"),
     telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
 ]
 
 other_buttons_2 = [
     telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Settings ⚙️", callback_data="settings"),
-    telebot.types.InlineKeyboardButton(text="Refresh 🔄", callback_data="refresh"),
+    telebot.types.InlineKeyboardButton(text="Refresh ", callback_data="refresh"),
 ]
 
-other_buttons_3 = [
-    telebot.types.InlineKeyboardButton(text="Close", callback_data="close")
-]
+close_button = [telebot.types.InlineKeyboardButton(text="Close", callback_data="close")]  # Single button for the last row
 
 # Create inline keyboard layout
-keyboard = telebot.types.InlineKeyboardMarkup(row_width=2)
-keyboard.add(*top_buttons)
-keyboard.add(*other_buttons)
-keyboard.add(*other_buttons_2)
-keyboard.add(*other_buttons_3)
+keyboard = telebot.types.InlineKeyboardMarkup()  # No row width specified for flexible arrangement
+
+# Add buttons in the desired order, ensuring each row has a maximum of 2 buttons
+keyboard.row(top_buttons[0], top_buttons[1])
+keyboard.row(other_buttons[0], other_buttons[1])
+keyboard.row(other_buttons[2])  # Single button for the 3rd row
+keyboard.row(other_buttons_2[0], other_buttons_2[1])
+keyboard.row(other_buttons_2[2])  # Single button for the 4th row
+keyboard.row(close_button[0])  # Single button for the last row
 
 # Set up logging
 logging.basicConfig(
@@ -348,80 +350,50 @@ def show_progress(chat_id, steps=3, interval=1):
         time.sleep(interval)
         bot.send_message(chat_id, f"Processing... ({i+1}/{steps})")
 
-@bot.callback_query_handler(func=lambda call: call.data == "sell_manage")
-def handle_sell_manage_button(call):
+@bot.callback_query_handler(func=lambda call: call.data == "sell")
+def handle_sell_button(call):
     chat_id = call.message.chat.id
-    user_tokens = get_user_tokens(chat_id)
-
-    if not user_tokens:
-        bot.send_message(chat_id, "You don't have any tokens to sell or manage yet.")
-        return
-
-    # Create a message with list of user tokens and buttons
-    message = "Your Tokens:\n\n"
-    for token_address, amount in user_tokens:
-        message += f"- {token_address} ({amount})\n"
-
+    show_progress(chat_id)
+    # Example of fetching user's positions to simulate management
+    positions = get_token_positions("user_wallet_address_placeholder")
+    positions_message = "Your current positions:\n" + "\n".join([f"{pos['token']}: {pos['amount']} units" for pos in positions])
     sell_buttons = [
-        telebot.types.InlineKeyboardButton(text="Back", callback_data="back_to_main"),
+        telebot.types.InlineKeyboardButton("Sell 1 unit", callback_data="sell_1"),
+        telebot.types.InlineKeyboardButton("Sell 5 units", callback_data="sell_5"),
+        telebot.types.InlineKeyboardButton("Manage Holdings", callback_data="manage_holdings")
     ]
-    for token_address, amount in user_tokens:
-        sell_buttons.append(
-            telebot.types.InlineKeyboardButton(
-                text=f"Sell {amount} {token_address}",
-                callback_data=f"sell_{token_address}_{amount}",
-            )
-        )
     sell_keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
     sell_keyboard.add(*sell_buttons)
+    bot.send_message(chat_id, positions_message, reply_markup=sell_keyboard)
 
-    bot.send_message(chat_id, message, reply_markup=sell_keyboard)
-
+def handle_sell_option(call, units):
+    chat_id = call.message.chat.id
+    # Simulate a sell operation
+    result = sell_token("user_wallet_address_placeholder", units)  # This function would need to be implemented
+    bot.send_message(chat_id, f"Sold {units} units. {result}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sell_"))
-def handle_sell_token(call):
-    chat_id = call.message.chat_id
-    data = call.data.split("_")
-    token_address = data[1]
-    amount = int(data[2])
+def handle_sell_actions(call):
+    units = int(call.data.split("_")[1])
+    handle_sell_option(call, units)
 
-    # Show progress bar before selling
+@bot.callback_query_handler(func=lambda call: call.data == "manage_holdings")
+def handle_manage_holdings(call):
+    chat_id = call.message.chat.id
     show_progress(chat_id)
+    # Here you might let users change settings or reallocate holdings
+    bot.send_message(chat_id, "Manage your holdings here. Feature under development.")
 
-    try:
-        # Simulate selling the token (replace with actual logic)
-        # This part might involve interacting with an exchange API
-        # and could potentially raise exceptions
-        sell_response = sell_token(token_address, amount)  # Replace with actual sell function
+def sell_token(wallet_address, units):
+    # Placeholder function to simulate selling tokens
+    return f"Transaction completed for {units} units."
 
-        if sell_response["success"]:
-            bot.send_message(chat_id, f"Successfully sold {amount} {token_address}!")
-        else:
-            error_message = sell_response["error_message"]
-            bot.send_message(chat_id, f"Sell failed: {error_message}")
-
-        # Update user tokens table (remove sold token)
-        conn = sqlite3.connect("referrals.db")
-        c = conn.cursor()
-        c.execute(
-            "DELETE FROM user_tokens WHERE chat_id = ? AND token_address = ?",
-            (chat_id, token_address),
-        )
-        conn.commit()
-        conn.close()
-
-    except Exception as e:
-        logging.error(f"Error selling token: {e}")
-        bot.send_message(chat_id, "An error occurred while selling the token. Please try again later.")
-
-
-# This function is a placeholder, replace it with your actual logic for selling tokens
-def sell_token(token_address, amount):
-    # Simulate successful sell
-    return {"success": True}
-
-    # Example of simulating a failed sell with an error message
-    # return {"success": False, "error_message": "Insufficient balance"}
+def get_token_positions(wallet_address):
+    # Placeholder function to simulate retrieving token positions
+    return [
+        {"token": "Token1", "amount": 100},
+        {"token": "Token2", "amount": 200}
+    ]
 
 def get_user_referral_link(chat_id):
     # Retrieve the user's referral link
