@@ -32,7 +32,7 @@ other_buttons_2 = [
     telebot.types.InlineKeyboardButton(text="Refresh", callback_data="refresh"),
 ]
 
-close_button = [telebot.types.InlineKeyboardButton(text="Close", callback_data="close")]  # Single button for the last row
+close_button = [telebot.types.InlineKeyboardButton(text="Close", callback_data="close")] # Single button for the last row
 
 # Create inline keyboard layout
 keyboard = telebot.types.InlineKeyboardMarkup() # No row width specified for flexible arrangement
