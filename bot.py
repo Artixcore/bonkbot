@@ -36,12 +36,12 @@ close_button = [telebot.types.InlineKeyboardButton(text="Close", callback_data="
 # Create inline keyboard layout
 keyboard = telebot.types.InlineKeyboardMarkup()  # No row width specified for flexible arrangement
 
-# Add buttons in the desired order, ensuring each row has a maximum of 2 buttons
-keyboard.row(top_buttons[0], top_buttons[1])
-keyboard.row(other_buttons[0], other_buttons[1])
-keyboard.row(other_buttons[2])  # Single button for the 3rd row
-keyboard.row(other_buttons_2[0], other_buttons_2[1])
-keyboard.row(other_buttons_2[2])  # Single button for the 4th row
+# Add buttons in the desired order, ensuring each row has the specified number of buttons
+keyboard.row(*top_buttons)  # Unpack elements of top_buttons list for first row (2 buttons)
+keyboard.row(*other_buttons[:2])  # Unpack first 2 elements of other_buttons for second row (2 buttons)
+keyboard.row(other_buttons[2])  # Single button for the third row
+keyboard.row(*other_buttons_2[:2])  # Unpack first 2 elements of other_buttons_2 for fourth row (2 buttons)
+keyboard.row(other_buttons_2[2])  # Single button for the fifth row
 keyboard.row(close_button[0])  # Single button for the last row
 
 # Set up logging
