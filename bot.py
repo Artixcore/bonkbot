@@ -27,7 +27,7 @@ other_buttons = [
 ]
 
 other_buttons_2 = [
-    telebot.types.InlineKeyboardButton(text="Refer a Friend 🍒", callback_data="refer"),
+    telebot.types.InlineKeyboardButton(text="Refer 🍒", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Settings ⚙️", callback_data="settings"),
     telebot.types.InlineKeyboardButton(text="Refresh 🔄", callback_data="refresh"),
 ]
