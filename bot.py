@@ -1,4 +1,3 @@
-
 import time
 import telebot
 import requests
@@ -17,23 +16,23 @@ bot = telebot.TeleBot(TOKEN)
 executor = ThreadPoolExecutor(max_workers=10)  # For handling concurrent requests
 
 top_buttons = [
-    telebot.types.InlineKeyboardButton(text="Buy🟢", callback_data="buy"),
-    telebot.types.InlineKeyboardButton(text="Sell & Manage", callback_data="sell"),
+    telebot.types.InlineKeyboardButton(text="Buy 🟢", callback_data="buy"),
+    telebot.types.InlineKeyboardButton(text="Sell & Manage 🔴", callback_data="sell"),
 ]
 
 other_buttons = [
-    telebot.types.InlineKeyboardButton(text="Help", callback_data="help"),
-    telebot.types.InlineKeyboardButton(text="Wallet", callback_data="wallet"),
-    telebot.types.InlineKeyboardButton(text="Alerts", callback_data="alerts"),
+    telebot.types.InlineKeyboardButton(text="Help 💁🏻", callback_data="help"),
+    telebot.types.InlineKeyboardButton(text="Wallet 👛", callback_data="wallet"),
+    telebot.types.InlineKeyboardButton(text="Alerts 🚨", callback_data="alerts"),
 ]
 
 other_buttons_2 = [
-    telebot.types.InlineKeyboardButton(text="Refer a Friend", callback_data="refer"),
+    telebot.types.InlineKeyboardButton(text="Refer a Friend 🍒", callback_data="refer"),
     telebot.types.InlineKeyboardButton(text="Settings ⚙️", callback_data="settings"),
-    telebot.types.InlineKeyboardButton(text="Refresh", callback_data="refresh"),
+    telebot.types.InlineKeyboardButton(text="Refresh 🔄", callback_data="refresh"),
 ]
 
-close_button = [telebot.types.InlineKeyboardButton(text="Close", callback_data="close")] # Single button for the last row
+close_button = [telebot.types.InlineKeyboardButton(text="Close ❎", callback_data="close")] # Single button for the last row
 
 # Create inline keyboard layout
 keyboard = telebot.types.InlineKeyboardMarkup() # No row width specified for flexible arrangement
